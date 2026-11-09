@@ -291,8 +291,8 @@ export class MergeDropGame implements GameInstance {
     }
   };
 
-  public handlePointerMove = (e: MouseEvent | TouchEvent, clientX: number, clientY: number) => {};
-  public handlePointerUp = () => {};
+  public handlePointerMove = (e: MouseEvent | TouchEvent, clientX: number, clientY: number) => { };
+  public handlePointerUp = () => { };
 
   private triggerManualDrop() {
     if (this.state !== 'RUNNING' || !this.canManualDrop) return;
@@ -477,13 +477,14 @@ export class MergeDropGame implements GameInstance {
       }
     }
 
-    const subSteps = 8;
+    const subSteps = 6;
     const subDt = effectiveDt / subSteps;
     const gravityAccel = this.config.GRAVITY * 2600;
     const restitution = this.config.RESTITUTION;
     const friction = Math.pow(this.config.FRICTION, subDt * 60);
 
     const isJar = this.config.CONTAINER_SHAPE === 'jar';
+    let hadMergeThisFrame = false;
 
     for (let step = 0; step < subSteps; step++) {
       // 1. Déplacement & Collision Parois
@@ -571,24 +572,41 @@ export class MergeDropGame implements GameInstance {
         }
       }
 
-      // 2. Collision & Fusion Cercle-Cercle
+      // 2. Collision & Fusion Cercle-Cercle (Sweep-and-Prune spatial optimisé 60 FPS)
       const toRemove = new Set<number>();
       const toAdd: MergeBall[] = [];
       const currentTiers = this.getCurrentTiers();
 
-      for (let i = 0; i < this.balls.length; i++) {
-        for (let j = i + 1; j < this.balls.length; j++) {
-          const b1 = this.balls[i];
-          const b2 = this.balls[j];
+      // Tri spatial selon Y pour un balayage ultra-rapide
+      const sorted = this.balls.slice().sort((a, b) => a.y - b.y);
 
-          if (toRemove.has(b1.id) || toRemove.has(b2.id)) continue;
+      for (let i = 0; i < sorted.length; i++) {
+        const b1 = sorted[i];
+        if (toRemove.has(b1.id)) continue;
 
-          const dx = b2.x - b1.x;
-          const dy = b2.y - b1.y;
-          const dist = Math.hypot(dx, dy);
+        // Limite Y maximale au-delà de laquelle aucune bille ne peut toucher b1
+        const maxR = 94; // rayon maximal possible (Soleil)
+        const cutoffY = b1.y + b1.radius + maxR;
+
+        for (let j = i + 1; j < sorted.length; j++) {
+          const b2 = sorted[j];
+
+          // Arrêt immédiat dès que les billes suivantes sont trop basses en Y
+          if (b2.y > cutoffY) break;
+          if (toRemove.has(b2.id)) continue;
+
           const minDist = b1.radius + b2.radius;
+          const dx = b2.x - b1.x;
 
-          if (dist < minDist && dist > 0) {
+          // Test AABB rapide en X sans calcul lourd
+          if (Math.abs(dx) >= minDist) continue;
+
+          const dy = b2.y - b1.y;
+          const distSq = dx * dx + dy * dy;
+          const minDistSq = minDist * minDist;
+
+          // Test de collision géométrique réel
+          if (distSq < minDistSq && distSq > 0) {
             // Fusion
             if (b1.tier === b2.tier && b1.tier < currentTiers.length - 1) {
               toRemove.add(b1.id);
@@ -626,11 +644,14 @@ export class MergeDropGame implements GameInstance {
               }
 
               this.triggerScreenShake(2 + nextTier * 0.4);
-              for (let s = 0; s < 10 + nextTier * 2; s++) {
-                this.sparks.push(new MergeSpark(midX, midY, currentTiers[nextTier].color));
+              if (this.sparks.length < 80) {
+                const count = Math.min(8, 4 + nextTier);
+                for (let s = 0; s < count; s++) {
+                  this.sparks.push(new MergeSpark(midX, midY, currentTiers[nextTier].color));
+                }
               }
 
-              this.syncHUD();
+              hadMergeThisFrame = true;
               continue;
             }
 
@@ -641,6 +662,7 @@ export class MergeDropGame implements GameInstance {
             }
 
             // Collision élastique
+            const dist = Math.sqrt(distSq);
             const nx = dx / dist;
             const ny = dy / dist;
             const overlap = minDist - dist;
@@ -652,6 +674,14 @@ export class MergeDropGame implements GameInstance {
             b1.y -= ny * overlap * (m2 / totalMass);
             b2.x += nx * overlap * (m1 / totalMass);
             b2.y += ny * overlap * (m1 / totalMass);
+
+            // Re-stabilisation dans les parois pour éviter tout bug d'enfoncement
+            if (isJar) {
+              const hw1 = this.getJarHalfWidth(b1.y);
+              b1.x = Math.max(270 - hw1 + b1.radius, Math.min(270 + hw1 - b1.radius, b1.x));
+              const hw2 = this.getJarHalfWidth(b2.y);
+              b2.x = Math.max(270 - hw2 + b2.radius, Math.min(270 + hw2 - b2.radius, b2.x));
+            }
 
             const rvx = b2.vx - b1.vx;
             const rvy = b2.vy - b1.vy;
@@ -672,6 +702,10 @@ export class MergeDropGame implements GameInstance {
         this.balls = this.balls.filter((b) => !toRemove.has(b.id));
         this.balls.push(...toAdd);
       }
+    }
+
+    if (hadMergeThisFrame) {
+      this.syncHUD();
     }
 
     for (let i = 0; i < this.balls.length; i++) {
@@ -723,6 +757,9 @@ export class MergeDropGame implements GameInstance {
     }
 
     // Mise à jour des particules d'étincelles
+    if (this.sparks.length > 70) {
+      this.sparks.splice(0, this.sparks.length - 70);
+    }
     for (let i = this.sparks.length - 1; i >= 0; i--) {
       this.sparks[i].update(effectiveDt);
       if (this.sparks[i].life <= 0) {
@@ -883,15 +920,15 @@ export class MergeDropGame implements GameInstance {
 
     ctx.save();
     ctx.beginPath();
-    ctx.setLineDash(this.isDangerWarning ? [10, 5] : [8, 6]);
+    ctx.setLineDash(this.isDangerWarning ? [8, 4] : [6, 4]);
     ctx.moveTo(270 - this.getJarHalfWidth(dangerY), dangerY);
     ctx.lineTo(270 + this.getJarHalfWidth(dangerY), dangerY);
     ctx.strokeStyle = this.isDangerWarning
       ? `rgba(255, 0, 85, ${0.85 + pulse * 0.15})`
-      : 'rgba(255, 45, 90, 0.85)';
-    ctx.lineWidth = this.isDangerWarning ? 4 : 2.5;
+      : 'rgba(255, 60, 100, 0.75)';
+    ctx.lineWidth = this.isDangerWarning ? 2.5 : 1.5;
     ctx.shadowColor = '#ff0055';
-    ctx.shadowBlur = this.isDangerWarning ? 20 : 8;
+    ctx.shadowBlur = this.isDangerWarning ? 8 : 3;
     ctx.stroke();
     ctx.restore();
 
@@ -903,7 +940,7 @@ export class MergeDropGame implements GameInstance {
       ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = '#ff0055';
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 8;
       ctx.fillText(`⚠️ DANGER: ${timeLeft}s ⚠️`, 270, dangerY - 12);
       ctx.restore();
     }
@@ -923,26 +960,27 @@ export class MergeDropGame implements GameInstance {
     }
 
     ctx.strokeStyle = '#00f0ff';
-    ctx.shadowColor = 'rgba(0, 240, 255, 0.7)';
-    ctx.shadowBlur = 18;
-    ctx.lineWidth = 6;
+    ctx.shadowColor = 'rgba(0, 240, 255, 0.55)';
+    ctx.shadowBlur = 5;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Cœur blanc pur
+    // Cœur blanc pur fin
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.shadowBlur = 0;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.0;
     ctx.stroke();
 
     // Anses décoratives de la Jarre (gauche et droite)
-    [ -1, 1 ].forEach((side) => {
+    [-1, 1].forEach((side) => {
       ctx.beginPath();
       const xAnchor = 270 + side * this.getJarHalfWidth(410);
       ctx.arc(xAnchor + side * 14, 440, 24, Math.PI * 0.5, Math.PI * 1.5, side === -1);
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.5)';
-      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 3;
       ctx.stroke();
     });
 
@@ -971,15 +1009,15 @@ export class MergeDropGame implements GameInstance {
 
     ctx.save();
     ctx.beginPath();
-    ctx.setLineDash(this.isDangerWarning ? [10, 5] : [8, 6]);
+    ctx.setLineDash(this.isDangerWarning ? [8, 4] : [6, 4]);
     ctx.moveTo(left, dangerY);
     ctx.lineTo(right, dangerY);
     ctx.strokeStyle = this.isDangerWarning
       ? `rgba(255, 0, 85, ${0.85 + pulse * 0.15})`
-      : 'rgba(255, 45, 90, 0.85)';
-    ctx.lineWidth = this.isDangerWarning ? 4 : 2.5;
+      : 'rgba(255, 60, 100, 0.75)';
+    ctx.lineWidth = this.isDangerWarning ? 2.5 : 1.5;
     ctx.shadowColor = '#ff0055';
-    ctx.shadowBlur = this.isDangerWarning ? 20 : 8;
+    ctx.shadowBlur = this.isDangerWarning ? 8 : 3;
     ctx.stroke();
     ctx.restore();
 
@@ -991,7 +1029,7 @@ export class MergeDropGame implements GameInstance {
       ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = '#ff0055';
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 8;
       ctx.fillText(`⚠️ DANGER: ${timeLeft}s ⚠️`, 270, dangerY - 12);
       ctx.restore();
     }
@@ -1006,16 +1044,16 @@ export class MergeDropGame implements GameInstance {
     ctx.lineTo(this.tubeRight, top);
 
     ctx.strokeStyle = '#00f0ff';
-    ctx.shadowColor = 'rgba(0, 240, 255, 0.6)';
-    ctx.shadowBlur = 16;
-    ctx.lineWidth = 6;
+    ctx.shadowColor = 'rgba(0, 240, 255, 0.55)';
+    ctx.shadowBlur = 5;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.shadowBlur = 0;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.0;
     ctx.stroke();
 
     // Fût du tube
@@ -1027,9 +1065,9 @@ export class MergeDropGame implements GameInstance {
     ctx.lineTo(this.tubeRight, this.tubeTop);
     ctx.lineTo(this.tubeRight, this.tubeBottom);
     ctx.strokeStyle = '#00f0ff';
-    ctx.shadowColor = 'rgba(0, 240, 255, 0.8)';
-    ctx.shadowBlur = 14;
-    ctx.lineWidth = 5;
+    ctx.shadowColor = 'rgba(0, 240, 255, 0.6)';
+    ctx.shadowBlur = 4;
+    ctx.lineWidth = 2.5;
     ctx.stroke();
 
     ctx.restore();

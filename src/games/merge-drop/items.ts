@@ -504,8 +504,6 @@ export class MergeSpark {
     context.save();
     context.globalAlpha = alpha;
     context.fillStyle = this.color;
-    context.shadowColor = this.color;
-    context.shadowBlur = 8;
     context.beginPath();
     context.arc(this.x, this.y, this.size * alpha, 0, Math.PI * 2);
     context.fill();
