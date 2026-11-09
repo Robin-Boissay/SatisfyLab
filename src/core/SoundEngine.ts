@@ -273,6 +273,97 @@ export class SoundEngine {
       osc.stop(t + 0.45);
     });
   }
+
+  /**
+   * Ralenti cosmique & Montée en charge gravitationnelle (Bullet Time)
+   */
+  public playSupernovaCharge() {
+    if (!this.ctx || this.isMuted) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(65, now);
+    osc.frequency.exponentialRampToValueAtTime(320, now + 1.3);
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.65, now + 1.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.35);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain!);
+
+    osc.start(now);
+    osc.stop(now + 1.35);
+
+    // Harmoniques cristallines montantes
+    [130, 195, 260].forEach((baseF, i) => {
+      const harmOsc = this.ctx!.createOscillator();
+      const harmGain = this.ctx!.createGain();
+
+      harmOsc.type = 'triangle';
+      harmOsc.frequency.setValueAtTime(baseF, now);
+      harmOsc.frequency.exponentialRampToValueAtTime(baseF * 3.0, now + 1.3);
+
+      harmGain.gain.setValueAtTime(0.001, now);
+      harmGain.gain.linearRampToValueAtTime(0.25 / (i + 1), now + 1.0);
+      harmGain.gain.exponentialRampToValueAtTime(0.001, now + 1.35);
+
+      harmOsc.connect(harmGain);
+      harmGain.connect(this.masterGain!);
+
+      harmOsc.start(now);
+      harmOsc.stop(now + 1.35);
+    });
+  }
+
+  /**
+   * Climax grandiose : Explosion Supernova & Carillon de Victoire Céleste
+   */
+  public playSupernovaExplosion() {
+    if (!this.ctx || this.isMuted) return;
+
+    this.playWallDestroy();
+
+    const now = this.ctx.currentTime;
+
+    // 1. Détonation sub-bass cosmique
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(120, now);
+    subOsc.frequency.exponentialRampToValueAtTime(30, now + 0.8);
+    subGain.gain.setValueAtTime(0.9, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+    subOsc.connect(subGain);
+    subGain.connect(this.masterGain!);
+    subOsc.start(now);
+    subOsc.stop(now + 0.8);
+
+    // 2. Cascade d'arpèges célestes majestueux (C-E-G-B-D-G-C)
+    const chords = [261.63, 329.63, 392.0, 493.88, 587.33, 783.99, 1046.5, 1318.5, 1567.98];
+    chords.forEach((freq, idx) => {
+      const noteTime = now + 0.08 + idx * 0.07;
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, noteTime);
+
+      const dur = 1.2 - idx * 0.05;
+      gain.gain.setValueAtTime(0.001, noteTime);
+      gain.gain.linearRampToValueAtTime(0.5, noteTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, noteTime + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(noteTime);
+      osc.stop(noteTime + dur);
+    });
+  }
 }
 
 export const sound = SoundEngine.getInstance();

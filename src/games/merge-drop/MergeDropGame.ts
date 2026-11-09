@@ -13,6 +13,27 @@ import { MergeBall, MergeSpark } from './items';
 const VIRTUAL_WIDTH = 540;
 const VIRTUAL_HEIGHT = 960;
 
+interface CosmicShockwave {
+  x: number;
+  y: number;
+  radius: number;
+  maxRadius: number;
+  color: string;
+  life: number;
+  maxLife: number;
+  lineWidth: number;
+}
+
+interface VortexParticle {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  color: string;
+  size: number;
+  progress: number;
+}
+
 export class MergeDropGame implements GameInstance {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -25,6 +46,8 @@ export class MergeDropGame implements GameInstance {
 
   private balls: MergeBall[] = [];
   private sparks: MergeSpark[] = [];
+  private shockwaves: CosmicShockwave[] = [];
+  private vortexParticles: VortexParticle[] = [];
   private nextBallId: number = 1;
 
   private score: number = 0;
@@ -33,11 +56,16 @@ export class MergeDropGame implements GameInstance {
   private currentHUD: GameHUDState = {};
 
   // État du jeu & Gestion du Débordement (Game Over)
-  private state: 'RUNNING' | 'GAME_OVER' = 'RUNNING';
+  private state: 'RUNNING' | 'GAME_OVER' | 'VICTORY' = 'RUNNING';
   public readonly dangerY = 380;
   private overflowTimer: number = 0;
   private isDangerWarning: boolean = false;
   private dangerSoundCooldown: number = 0;
+
+  // Climax Supernova Ralenti & Explosion Finale (Tier 9)
+  private climaxPhase: 'NONE' | 'SLOWMO_CHARGE' | 'EXPLOSION' | 'VICTORY_SCREEN' = 'NONE';
+  private climaxTimer: number = 0;
+  private timeScale: number = 1.0;
 
   // Géométrie Générale
   public readonly centerX = 270;
@@ -140,6 +168,8 @@ export class MergeDropGame implements GameInstance {
   public reset() {
     this.balls = [];
     this.sparks = [];
+    this.shockwaves = [];
+    this.vortexParticles = [];
     this.score = 0;
     this.maxTierReached = 0;
     this.nextTier = this.getRandomSpawnTier();
@@ -149,6 +179,9 @@ export class MergeDropGame implements GameInstance {
     this.autoStreamBallsDropped = 0;
     this.screenShake = 0;
     this.state = 'RUNNING';
+    this.climaxPhase = 'NONE';
+    this.climaxTimer = 0;
+    this.timeScale = 1.0;
     this.overflowTimer = 0;
     this.isDangerWarning = false;
     this.dangerSoundCooldown = 0;
@@ -165,7 +198,7 @@ export class MergeDropGame implements GameInstance {
 
   public triggerExtraAction = () => {
     sound.init();
-    if (this.state === 'GAME_OVER') {
+    if (this.state === 'GAME_OVER' || this.state === 'VICTORY') {
       this.reset();
       return;
     }
@@ -173,7 +206,7 @@ export class MergeDropGame implements GameInstance {
   };
 
   public toggleAutoStream(): boolean {
-    if (this.state === 'GAME_OVER') return false;
+    if (this.state === 'GAME_OVER' || this.state === 'VICTORY') return false;
     this.isAutoStreaming = !this.isAutoStreaming;
     this.config.AUTO_STREAM_ACTIVE = this.isAutoStreaming;
     this.autoStreamTimer = 0;
@@ -182,12 +215,31 @@ export class MergeDropGame implements GameInstance {
   }
 
   private triggerGameOver() {
-    if (this.state === 'GAME_OVER') return;
+    if (this.state === 'GAME_OVER' || this.state === 'VICTORY') return;
     this.state = 'GAME_OVER';
     this.isAutoStreaming = false;
     this.config.AUTO_STREAM_ACTIVE = false;
     this.triggerScreenShake(8.0);
     sound.playGameOver();
+    this.syncHUD();
+  }
+
+  /**
+   * Déclenche le Grand Final Cosmique (Supernova ralentie en Bullet Time)
+   */
+  private triggerSupernovaClimax(sunBall: MergeBall) {
+    this.state = 'VICTORY';
+    this.climaxPhase = 'SLOWMO_CHARGE';
+    this.climaxTimer = 0;
+    this.timeScale = 0.16; // Ralenti cosmique cinématographique
+
+    // Arrêt immédiat de tout largage par le haut
+    this.canManualDrop = false;
+    this.isAutoStreaming = false;
+    this.config.AUTO_STREAM_ACTIVE = false;
+
+    // Musique de montée en puissance
+    sound.playSupernovaCharge();
     this.syncHUD();
   }
 
@@ -202,6 +254,8 @@ export class MergeDropGame implements GameInstance {
 
     if (this.state === 'GAME_OVER') {
       statusText = isEn ? '💥 OVERFLOW! GAME OVER 💥' : '💥 DÉBORDEMENT ! PARTIE PERDUE 💥';
+    } else if (this.state === 'VICTORY') {
+      statusText = isEn ? '☀️ COSMIC SUPERNOVA! ULTIMATE MERGE ☀️' : '☀️ SUPERNOVA COSMIQUE ! VICTOIRE TOTALE ☀️';
     } else if (this.isDangerWarning) {
       statusText = isEn ? '⚠️ DANGER: OVERFLOW! ⚠️' : '⚠️ DANGER : DÉBORDEMENT ! ⚠️';
     } else if (this.maxTierReached === 9) {
@@ -215,7 +269,7 @@ export class MergeDropGame implements GameInstance {
 
     this.currentHUD = {
       title,
-      primaryMetricLabel: this.config.TEXT_METRIC_SCORE || (isEn ? 'SCORE' : 'SCORE'),
+      primaryMetricLabel: this.config.TEXT_METRIC_SCORE || 'SCORE',
       primaryMetricValue: this.score,
       secondaryMetricLabel: this.config.TEXT_METRIC_MAX_TIER || (isSolar ? (isEn ? 'MAX PLANET' : 'PLANÈTE MAX') : (isEn ? 'MAX TIER' : 'PALIER MAX')),
       secondaryMetricValue: `${currentMaxTierObj.symbol} ${tierLocalizedName}`,
@@ -228,11 +282,13 @@ export class MergeDropGame implements GameInstance {
 
   public handlePointerDown = (e: MouseEvent | TouchEvent, clientX: number, clientY: number) => {
     sound.init();
-    if (this.state === 'GAME_OVER') {
+    if (this.state === 'GAME_OVER' || this.climaxPhase === 'VICTORY_SCREEN') {
       this.reset();
       return;
     }
-    this.triggerManualDrop();
+    if (this.state === 'RUNNING') {
+      this.triggerManualDrop();
+    }
   };
 
   public handlePointerMove = (e: MouseEvent | TouchEvent, clientX: number, clientY: number) => {};
@@ -284,7 +340,7 @@ export class MergeDropGame implements GameInstance {
 
   private triggerScreenShake(intensity: number) {
     if (!this.config.SCREEN_SHAKE_ENABLED) return;
-    this.screenShake = Math.max(this.screenShake, Math.min(6.0, intensity));
+    this.screenShake = Math.max(this.screenShake, Math.min(18.0, intensity));
   }
 
   /**
@@ -313,6 +369,95 @@ export class MergeDropGame implements GameInstance {
   private updatePhysics(dt: number) {
     this.tubeFlowOffset = (this.tubeFlowOffset + dt * 180) % 30;
 
+    const effectiveDt = this.climaxPhase !== 'NONE' ? dt * this.timeScale : dt;
+
+    // Gestion de la cinématique de Supernova
+    if (this.climaxPhase !== 'NONE') {
+      this.climaxTimer += dt;
+      const sunBall = this.balls.find((b) => b.tier === 9);
+
+      if (this.climaxPhase === 'SLOWMO_CHARGE') {
+        if (sunBall) {
+          // Lévitation douce du Soleil vers le centre de la cuve
+          sunBall.x += (this.centerX - sunBall.x) * 2.2 * dt;
+          sunBall.y += (520 - sunBall.y) * 2.2 * dt;
+          sunBall.vx = 0;
+          sunBall.vy = 0;
+
+          // Pulsation façon cœur d'énergie cosmique qui gonfle
+          sunBall.scale = 1.15 + Math.sin(this.climaxTimer * 14) * 0.28 + this.climaxTimer * 0.18;
+
+          // Particules de vortex aspirées vers le Soleil (trou noir / singularité)
+          if (Math.random() < 0.75) {
+            const ang = Math.random() * Math.PI * 2;
+            const dist = 140 + Math.random() * 160;
+            this.vortexParticles.push({
+              x: sunBall.x + Math.cos(ang) * dist,
+              y: sunBall.y + Math.sin(ang) * dist,
+              targetX: sunBall.x,
+              targetY: sunBall.y,
+              color: Math.random() > 0.4 ? '#ffd700' : '#ff007f',
+              size: 2.5 + Math.random() * 3,
+              progress: 0
+            });
+          }
+
+          // Montée progressive de la secousse d'écran
+          this.triggerScreenShake(2.0 + this.climaxTimer * 4.5);
+        }
+
+        // Détonation de la Supernova au terme de la charge !
+        if (this.climaxTimer >= 1.4) {
+          this.climaxPhase = 'EXPLOSION';
+          this.timeScale = 0.5;
+          sound.playSupernovaExplosion();
+          this.triggerScreenShake(18.0);
+
+          if (sunBall) {
+            // Ondes de choc titanesques concentriques
+            this.shockwaves.push(
+              { x: sunBall.x, y: sunBall.y, radius: sunBall.radius, maxRadius: 550, color: '#ffffff', life: 1.0, maxLife: 1.0, lineWidth: 10 },
+              { x: sunBall.x, y: sunBall.y, radius: sunBall.radius * 0.7, maxRadius: 650, color: '#ffd700', life: 1.3, maxLife: 1.3, lineWidth: 16 },
+              { x: sunBall.x, y: sunBall.y, radius: sunBall.radius * 0.4, maxRadius: 780, color: '#ff007f', life: 1.6, maxLife: 1.6, lineWidth: 8 }
+            );
+
+            // Éjection et vaporisation de toutes les autres billes en poussière stellaire
+            for (let i = 0; i < this.balls.length; i++) {
+              const b = this.balls[i];
+              if (b.id !== sunBall.id) {
+                for (let s = 0; s < 14; s++) {
+                  this.sparks.push(new MergeSpark(b.x, b.y, b.tierData.color));
+                }
+              }
+            }
+            // Nuée d'étincelles solaires royales
+            for (let s = 0; s < 140; s++) {
+              this.sparks.push(new MergeSpark(sunBall.x, sunBall.y, Math.random() > 0.5 ? '#ffd700' : '#ff6d00'));
+            }
+
+            // Seul le Soleil brille triomphalement au centre
+            this.balls = [sunBall];
+            sunBall.scale = 1.55;
+            sunBall.flash = 1.0;
+          }
+        }
+      } else if (this.climaxPhase === 'EXPLOSION') {
+        if (sunBall) {
+          sunBall.scale = Math.max(1.0, sunBall.scale - 0.4 * dt);
+          sunBall.x = this.centerX;
+          sunBall.y = 520;
+          sunBall.vx = 0;
+          sunBall.vy = 0;
+        }
+
+        if (this.climaxTimer >= 3.2) {
+          this.climaxPhase = 'VICTORY_SCREEN';
+          this.timeScale = 1.0;
+          this.syncHUD();
+        }
+      }
+    }
+
     if (this.state === 'RUNNING') {
       if (!this.canManualDrop) {
         this.manualDropCooldown -= dt;
@@ -333,7 +478,7 @@ export class MergeDropGame implements GameInstance {
     }
 
     const subSteps = 8;
-    const subDt = dt / subSteps;
+    const subDt = effectiveDt / subSteps;
     const gravityAccel = this.config.GRAVITY * 2600;
     const restitution = this.config.RESTITUTION;
     const friction = Math.pow(this.config.FRICTION, subDt * 60);
@@ -344,6 +489,11 @@ export class MergeDropGame implements GameInstance {
       // 1. Déplacement & Collision Parois
       for (let i = 0; i < this.balls.length; i++) {
         const b = this.balls[i];
+
+        // Le Soleil en climax ne subit plus la gravité ordinaire
+        if (this.climaxPhase !== 'NONE' && b.tier === 9) {
+          continue;
+        }
 
         b.vy += gravityAccel * subDt;
         b.vx *= friction;
@@ -470,6 +620,11 @@ export class MergeDropGame implements GameInstance {
                 this.maxTierReached = nextTier;
               }
 
+              // Déclenchement grandiose si création de l'astre ultime (Le Soleil / Tier 9) !
+              if (nextTier === 9) {
+                this.triggerSupernovaClimax(mergedBall);
+              }
+
               this.triggerScreenShake(2 + nextTier * 0.4);
               for (let s = 0; s < 10 + nextTier * 2; s++) {
                 this.sparks.push(new MergeSpark(midX, midY, currentTiers[nextTier].color));
@@ -520,7 +675,7 @@ export class MergeDropGame implements GameInstance {
     }
 
     for (let i = 0; i < this.balls.length; i++) {
-      this.balls[i].update(dt);
+      this.balls[i].update(effectiveDt);
     }
 
     // 3. Détection du Débordement (Game Over au niveau de la ligne rouge dangerY)
@@ -567,17 +722,39 @@ export class MergeDropGame implements GameInstance {
       }
     }
 
+    // Mise à jour des particules d'étincelles
     for (let i = this.sparks.length - 1; i >= 0; i--) {
-      this.sparks[i].update(dt);
+      this.sparks[i].update(effectiveDt);
       if (this.sparks[i].life <= 0) {
         this.sparks.splice(i, 1);
+      }
+    }
+
+    // Mise à jour des ondes de choc Supernova
+    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+      const sw = this.shockwaves[i];
+      sw.radius += (sw.maxRadius - sw.radius) * 5.0 * dt;
+      sw.life -= dt;
+      if (sw.life <= 0) {
+        this.shockwaves.splice(i, 1);
+      }
+    }
+
+    // Mise à jour des particules de vortex
+    for (let i = this.vortexParticles.length - 1; i >= 0; i--) {
+      const vp = this.vortexParticles[i];
+      vp.progress += dt * 1.8;
+      vp.x += (vp.targetX - vp.x) * dt * 4.0;
+      vp.y += (vp.targetY - vp.y) * dt * 4.0;
+      if (vp.progress >= 1.0) {
+        this.vortexParticles.splice(i, 1);
       }
     }
 
     if (this.screenShake > 0) {
       this.shakeX = (Math.random() - 0.5) * this.screenShake;
       this.shakeY = (Math.random() - 0.5) * this.screenShake;
-      const decay = 16.0;
+      const decay = this.climaxPhase !== 'NONE' ? 6.0 : 16.0;
       this.screenShake = Math.max(0, this.screenShake - decay * dt);
     } else {
       this.shakeX = 0;
@@ -602,8 +779,45 @@ export class MergeDropGame implements GameInstance {
       this.drawTubeChamber();
     }
 
+    // Aperçu du spawner uniquement pendant le jeu normal
     if (this.state === 'RUNNING') {
       this.drawSpawnerPreview();
+    }
+
+    // Particules de vortex aspirées vers le Soleil pendant la charge
+    for (let i = 0; i < this.vortexParticles.length; i++) {
+      const vp = this.vortexParticles[i];
+      this.ctx.save();
+      this.ctx.fillStyle = vp.color;
+      this.ctx.shadowColor = vp.color;
+      this.ctx.shadowBlur = 8;
+      this.ctx.beginPath();
+      this.ctx.arc(vp.x, vp.y, vp.size * (1 - vp.progress * 0.7), 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+    }
+
+    // Rayons célestes tournants si Supernova active
+    if (this.climaxPhase === 'EXPLOSION' || this.climaxPhase === 'VICTORY_SCREEN') {
+      const sunBall = this.balls.find((b) => b.tier === 9);
+      if (sunBall) {
+        this.ctx.save();
+        this.ctx.translate(sunBall.x, sunBall.y);
+        const rot = performance.now() * 0.001;
+        this.ctx.rotate(rot);
+        const numBeams = 18;
+        for (let b = 0; b < numBeams; b++) {
+          const ang = (b * Math.PI * 2) / numBeams;
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, 0);
+          this.ctx.lineTo(Math.cos(ang - 0.06) * 500, Math.sin(ang - 0.06) * 500);
+          this.ctx.lineTo(Math.cos(ang + 0.06) * 500, Math.sin(ang + 0.06) * 500);
+          this.ctx.closePath();
+          this.ctx.fillStyle = b % 2 === 0 ? 'rgba(255, 215, 0, 0.12)' : 'rgba(255, 109, 0, 0.09)';
+          this.ctx.fill();
+        }
+        this.ctx.restore();
+      }
     }
 
     for (let i = 0; i < this.balls.length; i++) {
@@ -614,9 +828,27 @@ export class MergeDropGame implements GameInstance {
       this.sparks[i].draw(this.ctx);
     }
 
+    // Rendu des ondes de choc Supernova
+    for (let i = 0; i < this.shockwaves.length; i++) {
+      const sw = this.shockwaves[i];
+      const alpha = Math.max(0, sw.life / sw.maxLife);
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+      this.ctx.strokeStyle = sw.color;
+      this.ctx.globalAlpha = alpha;
+      this.ctx.lineWidth = sw.lineWidth * alpha;
+      this.ctx.shadowColor = sw.color;
+      this.ctx.shadowBlur = 24;
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
+
     // Dessin de l'écran Game Over si débordement confirmé
     if (this.state === 'GAME_OVER') {
       this.drawGameOverOverlay();
+    } else if (this.climaxPhase === 'VICTORY_SCREEN') {
+      this.drawVictoryOverlay();
     }
 
     // Dessin du HUD textuel en haut du Canvas (inclus dans la vidéo 9:16)
@@ -931,6 +1163,83 @@ export class MergeDropGame implements GameInstance {
       isEn ? '▶ Click or Press [R] to Restart' : '▶ Cliquez ou Appuyez sur [R] pour Rejouer',
       VIRTUAL_WIDTH / 2,
       boxY + 258
+    );
+
+    ctx.restore();
+  }
+
+  private drawVictoryOverlay() {
+    const ctx = this.ctx;
+    const isEn = this.config.TEXT_METRIC_MAX_TIER === 'MAX PLANET' || this.config.TEXT_METRIC_SCORE === 'SCORE';
+
+    ctx.save();
+    // Voile nébuleuse royale
+    ctx.fillStyle = 'rgba(10, 6, 22, 0.84)';
+    ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+
+    const boxW = 440;
+    const boxH = 320;
+    const boxX = (VIRTUAL_WIDTH - boxW) / 2;
+    const boxY = (VIRTUAL_HEIGHT - boxH) / 2 + 15;
+
+    // Cadre doré rayonnant
+    ctx.fillStyle = 'rgba(28, 18, 38, 0.96)';
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = 'rgba(255, 215, 0, 0.9)';
+    ctx.shadowBlur = 32;
+
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxW, boxH, 20);
+    ctx.fill();
+    ctx.stroke();
+
+    // Titre SUPERNOVA COSMIQUE
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = '#ffd700';
+    ctx.font = '900 32px "Inter", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(isEn ? '☀️ COSMIC SUPERNOVA ☀️' : '☀️ SUPERNOVA COSMIQUE ☀️', VIRTUAL_WIDTH / 2, boxY + 58);
+
+    // Sous-titre
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff9c4';
+    ctx.font = '600 15px "Inter", sans-serif';
+    ctx.fillText(
+      isEn ? 'The Sun has ignited the Cosmos!' : 'Le Soleil a embrasé le Système Solaire !',
+      VIRTUAL_WIDTH / 2,
+      boxY + 98
+    );
+
+    // Séparateur
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(boxX + 30, boxY + 122);
+    ctx.lineTo(boxX + boxW - 30, boxY + 122);
+    ctx.stroke();
+
+    // Score final astronomique
+    ctx.fillStyle = '#00f0ff';
+    ctx.font = 'bold 24px "JetBrains Mono", sans-serif';
+    ctx.fillText(`${isEn ? 'Ultimate Score:' : 'Score Ultime :'} ${this.score}`, VIRTUAL_WIDTH / 2, boxY + 168);
+
+    ctx.fillStyle = '#ff9100';
+    ctx.font = 'bold 18px "Inter", sans-serif';
+    ctx.fillText(
+      isEn ? '👑 RANK: MASTER OF THE UNIVERSE' : '👑 RANG : MAÎTRE DU SYSTÈME SOLAIRE',
+      VIRTUAL_WIDTH / 2,
+      boxY + 210
+    );
+
+    // Bouton de redémarrage
+    const pulse = (Math.sin(performance.now() * 0.008) + 1) * 0.5;
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.8 + pulse * 0.2})`;
+    ctx.font = 'bold 15px "Inter", sans-serif';
+    ctx.fillText(
+      isEn ? '▶ Click or Press [R] to Play Again' : '▶ Cliquez ou Appuyez sur [R] pour Rejouer',
+      VIRTUAL_WIDTH / 2,
+      boxY + 272
     );
 
     ctx.restore();
