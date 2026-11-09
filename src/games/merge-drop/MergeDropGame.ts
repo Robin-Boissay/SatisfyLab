@@ -513,16 +513,24 @@ export class MergeDropGame implements GameInstance {
       this.balls[i].update(dt);
     }
 
-    // 3. Détection du Débordement (Game Over au-dessus de dangerY)
+    // 3. Détection du Débordement (Game Over au niveau de la ligne rouge dangerY)
     let hasOverflowingBall = false;
     for (let i = 0; i < this.balls.length; i++) {
       const b = this.balls[i];
-      // La bille doit être stabilisée (age > 1.2s et vy < 85) et son sommet dépasser la ligne rouge
-      if (b.age > 1.2 && (b.y - b.radius) < this.dangerY && b.vy < 85) {
+      // Une bille déborde si elle a atteint ou dépassé la ligne rouge (son centre est au-dessus de dangerY)
+      // tout en étant située au niveau de la cuve / ligne rouge (b.y + b.radius >= this.dangerY - 45)
+      // et stabilisée sur la pile (non en chute libre rapide, vy < 160 et age > 0.4s)
+      const isAboveDanger = b.y <= this.dangerY;
+      const isAtContainerTop = (b.y + b.radius) >= (this.dangerY - 45);
+      const isSettled = b.age > 0.4 && b.vy < 160;
+
+      if (isAboveDanger && isAtContainerTop && isSettled) {
         hasOverflowingBall = true;
         break;
       }
     }
+
+    const DANGER_DURATION = 1.6;
 
     if (this.state === 'RUNNING') {
       if (hasOverflowingBall) {
@@ -531,16 +539,19 @@ export class MergeDropGame implements GameInstance {
         this.dangerSoundCooldown -= dt;
         if (this.dangerSoundCooldown <= 0) {
           sound.playDanger();
-          this.dangerSoundCooldown = 0.45;
+          this.dangerSoundCooldown = 0.38;
         }
 
-        if (this.overflowTimer >= 2.0) {
+        if (this.overflowTimer >= DANGER_DURATION) {
           this.triggerGameOver();
         }
       } else {
-        this.isDangerWarning = false;
-        this.overflowTimer = Math.max(0, this.overflowTimer - dt * 2);
-        this.dangerSoundCooldown = 0;
+        // Décroissance douce pour éviter l'annulation du danger en cas de micro-rebonds
+        this.overflowTimer = Math.max(0, this.overflowTimer - dt * 0.75);
+        if (this.overflowTimer <= 0) {
+          this.isDangerWarning = false;
+          this.dangerSoundCooldown = 0;
+        }
       }
     }
 
@@ -628,29 +639,27 @@ export class MergeDropGame implements GameInstance {
 
     ctx.save();
     ctx.beginPath();
-    ctx.setLineDash(this.isDangerWarning ? [12, 6] : [8, 8]);
+    ctx.setLineDash(this.isDangerWarning ? [10, 5] : [8, 6]);
     ctx.moveTo(270 - this.getJarHalfWidth(dangerY), dangerY);
     ctx.lineTo(270 + this.getJarHalfWidth(dangerY), dangerY);
     ctx.strokeStyle = this.isDangerWarning
       ? `rgba(255, 0, 85, ${0.85 + pulse * 0.15})`
-      : 'rgba(255, 0, 85, 0.4)';
-    ctx.lineWidth = this.isDangerWarning ? 4 : 2;
-    if (this.isDangerWarning) {
-      ctx.shadowColor = '#ff0055';
-      ctx.shadowBlur = 18;
-    }
+      : 'rgba(255, 45, 90, 0.85)';
+    ctx.lineWidth = this.isDangerWarning ? 4 : 2.5;
+    ctx.shadowColor = '#ff0055';
+    ctx.shadowBlur = this.isDangerWarning ? 20 : 8;
     ctx.stroke();
     ctx.restore();
 
     // Badge d'alerte en cas de danger
     if (this.isDangerWarning && this.state === 'RUNNING') {
       ctx.save();
-      const timeLeft = Math.max(0, 2.0 - this.overflowTimer).toFixed(1);
+      const timeLeft = Math.max(0, 1.6 - this.overflowTimer).toFixed(1);
       ctx.fillStyle = '#ff0055';
       ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = '#ff0055';
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 12;
       ctx.fillText(`⚠️ DANGER: ${timeLeft}s ⚠️`, 270, dangerY - 12);
       ctx.restore();
     }
@@ -718,29 +727,27 @@ export class MergeDropGame implements GameInstance {
 
     ctx.save();
     ctx.beginPath();
-    ctx.setLineDash(this.isDangerWarning ? [12, 6] : [8, 8]);
+    ctx.setLineDash(this.isDangerWarning ? [10, 5] : [8, 6]);
     ctx.moveTo(left, dangerY);
     ctx.lineTo(right, dangerY);
     ctx.strokeStyle = this.isDangerWarning
       ? `rgba(255, 0, 85, ${0.85 + pulse * 0.15})`
-      : 'rgba(255, 0, 85, 0.35)';
-    ctx.lineWidth = this.isDangerWarning ? 4 : 2;
-    if (this.isDangerWarning) {
-      ctx.shadowColor = '#ff0055';
-      ctx.shadowBlur = 18;
-    }
+      : 'rgba(255, 45, 90, 0.85)';
+    ctx.lineWidth = this.isDangerWarning ? 4 : 2.5;
+    ctx.shadowColor = '#ff0055';
+    ctx.shadowBlur = this.isDangerWarning ? 20 : 8;
     ctx.stroke();
     ctx.restore();
 
     // Badge d'alerte en cas de danger
     if (this.isDangerWarning && this.state === 'RUNNING') {
       ctx.save();
-      const timeLeft = Math.max(0, 2.0 - this.overflowTimer).toFixed(1);
+      const timeLeft = Math.max(0, 1.6 - this.overflowTimer).toFixed(1);
       ctx.fillStyle = '#ff0055';
       ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
       ctx.textAlign = 'center';
       ctx.shadowColor = '#ff0055';
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 12;
       ctx.fillText(`⚠️ DANGER: ${timeLeft}s ⚠️`, 270, dangerY - 12);
       ctx.restore();
     }
