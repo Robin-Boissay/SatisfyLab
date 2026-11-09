@@ -202,6 +202,8 @@ export class MergeDropGame implements GameInstance {
 
     if (this.state === 'GAME_OVER') {
       statusText = isEn ? '💥 OVERFLOW! GAME OVER 💥' : '💥 DÉBORDEMENT ! PARTIE PERDUE 💥';
+    } else if (this.isDangerWarning) {
+      statusText = isEn ? '⚠️ DANGER: OVERFLOW! ⚠️' : '⚠️ DANGER : DÉBORDEMENT ! ⚠️';
     } else if (this.maxTierReached === 9) {
       statusText = this.config.TEXT_STATUS_VICTORY || (isSolar ? (isEn ? '☀️ SUN CREATED! COSMIC VICTORY ☀️' : '☀️ SOLEIL CRÉÉ ! VICTOIRE COSMIQUE ☀️') : (isEn ? '⭐ ULTIMATE MERGE REACHED! ⭐' : '⭐ FUSION ULTIME ATTEINTE ! ⭐'));
     }
@@ -348,6 +350,10 @@ export class MergeDropGame implements GameInstance {
         b.vy *= friction;
         b.x += b.vx * subDt;
         b.y += b.vy * subDt;
+
+        if (!b.hasEnteredJar && b.y > this.dangerY) {
+          b.hasEnteredJar = true;
+        }
 
         if (isJar) {
           // --- COLLISIONS DANS LA JARRE ---
@@ -517,41 +523,44 @@ export class MergeDropGame implements GameInstance {
     let hasOverflowingBall = false;
     for (let i = 0; i < this.balls.length; i++) {
       const b = this.balls[i];
-      // Une bille déborde si elle a atteint ou dépassé la ligne rouge (son centre est au-dessus de dangerY)
-      // tout en étant située au niveau de la cuve / ligne rouge (b.y + b.radius >= this.dangerY - 45)
-      // et stabilisée sur la pile (non en chute libre rapide, vy < 160 et age > 0.4s)
-      const isAboveDanger = b.y <= this.dangerY;
-      const isAtContainerTop = (b.y + b.radius) >= (this.dangerY - 45);
-      const isSettled = b.age > 0.4 && b.vy < 160;
+      // Une bille déborde si elle a déjà pénétré dans le récipient (ou est bloquée en surface depuis > 0.8s)
+      // et que son sommet dépasse au-dessus de la ligne rouge
+      const isInPlay = b.hasEnteredJar || b.age > 0.8;
+      const isAboveDangerLine = (b.y - b.radius) < this.dangerY;
 
-      if (isAboveDanger && isAtContainerTop && isSettled) {
+      if (isInPlay && isAboveDangerLine) {
         hasOverflowingBall = true;
         break;
       }
     }
 
-    const DANGER_DURATION = 1.6;
+    const DANGER_DURATION = 1.3;
 
     if (this.state === 'RUNNING') {
+      const prevDanger = this.isDangerWarning;
       if (hasOverflowingBall) {
         this.isDangerWarning = true;
         this.overflowTimer += dt;
         this.dangerSoundCooldown -= dt;
         if (this.dangerSoundCooldown <= 0) {
           sound.playDanger();
-          this.dangerSoundCooldown = 0.38;
+          this.dangerSoundCooldown = 0.35;
         }
 
         if (this.overflowTimer >= DANGER_DURATION) {
           this.triggerGameOver();
         }
       } else {
-        // Décroissance douce pour éviter l'annulation du danger en cas de micro-rebonds
-        this.overflowTimer = Math.max(0, this.overflowTimer - dt * 0.75);
+        // Décroissance douce si les billes redescendent sous la ligne
+        this.overflowTimer = Math.max(0, this.overflowTimer - dt * 0.8);
         if (this.overflowTimer <= 0) {
           this.isDangerWarning = false;
           this.dangerSoundCooldown = 0;
         }
+      }
+
+      if (this.isDangerWarning !== prevDanger) {
+        this.syncHUD();
       }
     }
 
@@ -654,7 +663,7 @@ export class MergeDropGame implements GameInstance {
     // Badge d'alerte en cas de danger
     if (this.isDangerWarning && this.state === 'RUNNING') {
       ctx.save();
-      const timeLeft = Math.max(0, 1.6 - this.overflowTimer).toFixed(1);
+      const timeLeft = Math.max(0, 1.3 - this.overflowTimer).toFixed(1);
       ctx.fillStyle = '#ff0055';
       ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
       ctx.textAlign = 'center';
@@ -742,7 +751,7 @@ export class MergeDropGame implements GameInstance {
     // Badge d'alerte en cas de danger
     if (this.isDangerWarning && this.state === 'RUNNING') {
       ctx.save();
-      const timeLeft = Math.max(0, 1.6 - this.overflowTimer).toFixed(1);
+      const timeLeft = Math.max(0, 1.3 - this.overflowTimer).toFixed(1);
       ctx.fillStyle = '#ff0055';
       ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
       ctx.textAlign = 'center';
