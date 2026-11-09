@@ -1,0 +1,403 @@
+/* ==============================================================================
+   RESET & STRUCTURE DE BASE DARK NEON
+   ============================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  background-color: #050609;
+  background-image: 
+    radial-gradient(circle at 50% 30%, rgba(20, 30, 55, 0.5) 0%, transparent 70%),
+    radial-gradient(circle at 50% 80%, rgba(15, 20, 35, 0.6) 0%, transparent 60%);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #fff;
+}
+
+/* ==============================================================================
+   CONTENEUR VERTICAL 9:16 (OPTIMISÉ SHORTS / TIKTOK / REELS)
+   ============================================================================== */
+.viewport-frame {
+  position: relative;
+  width: min(100vw, calc(100vh * 9 / 16));
+  height: min(100vh, calc(100vw * 16 / 9));
+  max-width: 540px;
+  max-height: 960px;
+  aspect-ratio: 9 / 16;
+  background: radial-gradient(circle at center, #0e121f 0%, #080a12 60%, #040508 100%);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  box-shadow: 
+    0 0 60px rgba(0, 240, 255, 0.12),
+    0 30px 80px rgba(0, 0, 0, 0.9),
+    inset 0 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 560px), (max-height: 980px) {
+  .viewport-frame {
+    border-radius: 0;
+    box-shadow: none;
+    max-width: 100vw;
+    max-height: 100vh;
+  }
+}
+
+/* Canvas de rendu 2D Retina */
+canvas#simulationCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+}
+
+/* ==============================================================================
+   INTERFACE MINIMALE SUPERPOSÉE (HUD)
+   ============================================================================== */
+.hud-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px 20px;
+}
+
+/* En-tête supérieur : Compteur de rebonds & Vitesse */
+.hud-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.challenge-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.challenge-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: rgba(14, 18, 31, 0.7);
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.timer-box {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.timer-count {
+  font-size: 60px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -2px;
+  background: linear-gradient(180deg, #ffffff 25%, #00f0ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 35px rgba(0, 240, 255, 0.65);
+  transition: transform 0.08s ease, color 0.2s ease;
+}
+
+.timer-count.danger {
+  background: linear-gradient(180deg, #ffffff 20%, #ff0055 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 40px rgba(255, 0, 85, 0.9);
+  animation: timerPulse 0.5s infinite alternate;
+}
+
+@keyframes timerPulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.08); }
+}
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.5px;
+}
+
+.stat-item .stat-val {
+  font-weight: 800;
+  color: #00f0ff;
+}
+
+.stat-item.speed .stat-val {
+  color: #ffaa00;
+  transition: color 0.2s ease;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ==============================================================================
+   BOUTONS DE CONTRÔLE INFÉRIEURS (STYLE GLASSMORPHISM)
+   ============================================================================== */
+.hud-bottom {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  pointer-events: auto;
+}
+
+.glass-btn {
+  background: rgba(20, 26, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50px;
+  color: #fff;
+  padding: 10px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.glass-btn:hover {
+  background: rgba(40, 52, 85, 0.85);
+  border-color: rgba(0, 240, 255, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 240, 255, 0.25);
+}
+
+.glass-btn:active {
+  transform: translateY(1px);
+}
+
+.glass-btn.icon-only {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.glass-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+/* ==============================================================================
+   INVITATION AU LANCEMENT INITIAL
+   ============================================================================== */
+.start-prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(8, 11, 20, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  padding: 16px 28px;
+  border-radius: 40px;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 0 35px rgba(0, 240, 255, 0.25);
+  animation: pulseGlow 2s infinite ease-in-out;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 20;
+}
+
+.start-prompt.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -45%) scale(0.95);
+}
+
+.start-prompt h2 {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.start-prompt p {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.5px;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.25);
+    border-color: rgba(0, 240, 255, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 45px rgba(0, 240, 255, 0.55);
+    border-color: rgba(0, 240, 255, 0.8);
+  }
+}
+
+/* ==============================================================================
+   MODAL DE VICTOIRE / CLIMAX & PERFECT LOOP
+   ============================================================================== */
+.victory-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  width: 82%;
+  background: rgba(10, 14, 26, 0.92);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  border-radius: 28px;
+  padding: 28px 20px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 
+    0 0 60px rgba(255, 215, 0, 0.35),
+    0 20px 40px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 30;
+}
+
+.victory-modal.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.victory-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #ff9900, #ffdd00);
+  color: #000;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 10px rgba(255, 170, 0, 0.4);
+}
+
+.victory-modal h1 {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  background: linear-gradient(180deg, #fff 20%, #ffe600 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 16px;
+  text-shadow: 0 0 25px rgba(255, 230, 0, 0.5);
+}
+
+.victory-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.victory-stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 10px 8px;
+}
+
+.victory-stat-card .v-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 2px;
+}
+
+.victory-stat-card .v-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #00f0ff;
+}
+
+.loop-progress-container {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.loop-progress-bar {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #00f0ff, #ffe600);
+  transform-origin: left;
+  transform: scaleX(1);
+}
+
+.loop-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 8px;
+  letter-spacing: 0.5px;
+}
