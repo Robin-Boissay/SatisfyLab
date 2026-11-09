@@ -97,3 +97,4 @@ npm run preview
 ## 📄 Licence
 
 Projet personnel sous licence MIT.
+

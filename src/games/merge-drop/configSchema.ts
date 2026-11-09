@@ -62,6 +62,18 @@ export const mergeDropConfigSchema: ConfigSchema = {
   },
 
   // --- PHYSIQUE ---
+  BASE_BALL_RADIUS: {
+    id: 'BASE_BALL_RADIUS',
+    label: 'Taille bille minimum (base)',
+    type: 'range',
+    category: 'physics',
+    min: 10,
+    max: 26,
+    step: 1,
+    unit: 'px',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.BASE_BALL_RADIUS,
+    description: "Rayon de la plus petite bille (niveau 0). Toutes les autres sphères s'adaptent proportionnellement."
+  },
   GRAVITY: {
     id: 'GRAVITY',
     label: 'Gravité de chute',

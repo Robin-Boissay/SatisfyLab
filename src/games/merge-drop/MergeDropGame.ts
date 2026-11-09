@@ -5,7 +5,8 @@ import {
   MergeDropConfig,
   DEFAULT_MERGE_DROP_CONFIG,
   MergeTier,
-  getTiersForTheme
+  getTiersForTheme,
+  getTierLocalizedName
 } from './types';
 import { MergeBall, MergeSpark } from './items';
 
@@ -30,6 +31,13 @@ export class MergeDropGame implements GameInstance {
   private maxTierReached: number = 0;
   private nextTier: number = 0;
   private currentHUD: GameHUDState = {};
+
+  // État du jeu & Gestion du Débordement (Game Over)
+  private state: 'RUNNING' | 'GAME_OVER' = 'RUNNING';
+  public readonly dangerY = 380;
+  private overflowTimer: number = 0;
+  private isDangerWarning: boolean = false;
+  private dangerSoundCooldown: number = 0;
 
   // Géométrie Générale
   public readonly centerX = 270;
@@ -94,7 +102,7 @@ export class MergeDropGame implements GameInstance {
   };
 
   private getCurrentTiers(): MergeTier[] {
-    return getTiersForTheme(this.config.SKIN_THEME);
+    return getTiersForTheme(this.config.SKIN_THEME, this.config.BASE_BALL_RADIUS || 16);
   }
 
   private getRandomSpawnTier(): number {
@@ -104,14 +112,19 @@ export class MergeDropGame implements GameInstance {
 
   public updateConfig(newConfig: Partial<MergeDropConfig>) {
     const prevTheme = this.config.SKIN_THEME;
+    const prevBaseRadius = this.config.BASE_BALL_RADIUS;
     this.config = { ...this.config, ...newConfig };
 
     if (newConfig.AUTO_STREAM_ACTIVE !== undefined) {
       this.isAutoStreaming = newConfig.AUTO_STREAM_ACTIVE;
     }
 
+    if (newConfig.BASE_BALL_RADIUS !== undefined && newConfig.BASE_BALL_RADIUS !== prevBaseRadius) {
+      this.balls.forEach((b) => b.updateRadius(this.config.BASE_BALL_RADIUS));
+    }
+
     if (newConfig.SKIN_THEME !== undefined && newConfig.SKIN_THEME !== prevTheme) {
-      this.balls.forEach((b) => b.setTheme(this.config.SKIN_THEME));
+      this.balls.forEach((b) => b.setTheme(this.config.SKIN_THEME, this.config.BASE_BALL_RADIUS));
     }
 
     this.syncHUD();
@@ -135,6 +148,10 @@ export class MergeDropGame implements GameInstance {
     this.autoStreamTimer = 0;
     this.autoStreamBallsDropped = 0;
     this.screenShake = 0;
+    this.state = 'RUNNING';
+    this.overflowTimer = 0;
+    this.isDangerWarning = false;
+    this.dangerSoundCooldown = 0;
     this.syncHUD();
   }
 
@@ -148,10 +165,15 @@ export class MergeDropGame implements GameInstance {
 
   public triggerExtraAction = () => {
     sound.init();
+    if (this.state === 'GAME_OVER') {
+      this.reset();
+      return;
+    }
     this.toggleAutoStream();
   };
 
   public toggleAutoStream(): boolean {
+    if (this.state === 'GAME_OVER') return false;
     this.isAutoStreaming = !this.isAutoStreaming;
     this.config.AUTO_STREAM_ACTIVE = this.isAutoStreaming;
     this.autoStreamTimer = 0;
@@ -159,27 +181,42 @@ export class MergeDropGame implements GameInstance {
     return this.isAutoStreaming;
   }
 
+  private triggerGameOver() {
+    if (this.state === 'GAME_OVER') return;
+    this.state = 'GAME_OVER';
+    this.isAutoStreaming = false;
+    this.config.AUTO_STREAM_ACTIVE = false;
+    this.triggerScreenShake(8.0);
+    sound.playGameOver();
+    this.syncHUD();
+  }
+
   private syncHUD() {
+    const isEn = this.config.TEXT_METRIC_MAX_TIER === 'MAX PLANET' || this.config.TEXT_METRIC_SCORE === 'SCORE';
     const tiers = this.getCurrentTiers();
     const currentMaxTierObj = tiers[this.maxTierReached] || tiers[0];
     const isSolar = this.config.SKIN_THEME === 'solar';
 
-    const title = this.config.TEXT_TITLE || (isSolar ? '🪐 SYSTÈME SOLAIRE' : '⚡ NEON MERGE DROP');
+    const title = this.config.TEXT_TITLE || (isSolar ? (isEn ? '🪐 SOLAR SYSTEM' : '🪐 SYSTÈME SOLAIRE') : '⚡ NEON MERGE DROP');
     let statusText: string | undefined;
 
-    if (this.maxTierReached === 9) {
-      statusText = this.config.TEXT_STATUS_VICTORY || (isSolar ? '☀️ SOLEIL CRÉÉ ! VICTOIRE COSMIQUE ☀️' : '⭐ FUSION ULTIME ATTEINTE ! ⭐');
+    if (this.state === 'GAME_OVER') {
+      statusText = isEn ? '💥 OVERFLOW! GAME OVER 💥' : '💥 DÉBORDEMENT ! PARTIE PERDUE 💥';
+    } else if (this.maxTierReached === 9) {
+      statusText = this.config.TEXT_STATUS_VICTORY || (isSolar ? (isEn ? '☀️ SUN CREATED! COSMIC VICTORY ☀️' : '☀️ SOLEIL CRÉÉ ! VICTOIRE COSMIQUE ☀️') : (isEn ? '⭐ ULTIMATE MERGE REACHED! ⭐' : '⭐ FUSION ULTIME ATTEINTE ! ⭐'));
     }
 
-    const streamStopLabel = this.config.TEXT_ACTION_STREAM_STOP || (isSolar ? 'ARRÊTER RAFALE ASTÉROÏDES' : 'ARRÊTER RAFALE NIVEAU 1');
-    const streamStartLabel = this.config.TEXT_ACTION_STREAM_START || (isSolar ? 'LANCER RAFALE ASTÉROÏDES' : 'LANCER RAFALE NIVEAU 1');
+    const streamStopLabel = this.config.TEXT_ACTION_STREAM_STOP || (isSolar ? (isEn ? 'STOP ASTEROID STREAM' : 'ARRÊTER RAFALE ASTÉROÏDES') : (isEn ? 'STOP STREAM TIER 1' : 'ARRÊTER RAFALE NIVEAU 1'));
+    const streamStartLabel = this.config.TEXT_ACTION_STREAM_START || (isSolar ? (isEn ? 'LAUNCH ASTEROID STREAM' : 'LANCER RAFALE ASTÉROÏDES') : (isEn ? 'LAUNCH STREAM TIER 1' : 'LANCER RAFALE NIVEAU 1'));
+
+    const tierLocalizedName = getTierLocalizedName(currentMaxTierObj, isEn);
 
     this.currentHUD = {
       title,
-      primaryMetricLabel: this.config.TEXT_METRIC_SCORE || 'SCORE',
+      primaryMetricLabel: this.config.TEXT_METRIC_SCORE || (isEn ? 'SCORE' : 'SCORE'),
       primaryMetricValue: this.score,
-      secondaryMetricLabel: this.config.TEXT_METRIC_MAX_TIER || (isSolar ? 'PLANÈTE MAX' : 'PALIER MAX'),
-      secondaryMetricValue: `${currentMaxTierObj.symbol} ${currentMaxTierObj.name}`,
+      secondaryMetricLabel: this.config.TEXT_METRIC_MAX_TIER || (isSolar ? (isEn ? 'MAX PLANET' : 'PLANÈTE MAX') : (isEn ? 'MAX TIER' : 'PALIER MAX')),
+      secondaryMetricValue: `${currentMaxTierObj.symbol} ${tierLocalizedName}`,
       statusText,
       extraActionLabel: this.isAutoStreaming ? streamStopLabel : streamStartLabel,
       extraActionActive: this.isAutoStreaming
@@ -189,6 +226,10 @@ export class MergeDropGame implements GameInstance {
 
   public handlePointerDown = (e: MouseEvent | TouchEvent, clientX: number, clientY: number) => {
     sound.init();
+    if (this.state === 'GAME_OVER') {
+      this.reset();
+      return;
+    }
     this.triggerManualDrop();
   };
 
@@ -196,7 +237,7 @@ export class MergeDropGame implements GameInstance {
   public handlePointerUp = () => {};
 
   private triggerManualDrop() {
-    if (!this.canManualDrop) return;
+    if (this.state !== 'RUNNING' || !this.canManualDrop) return;
 
     sound.playDrop();
 
@@ -206,7 +247,8 @@ export class MergeDropGame implements GameInstance {
       this.dropX,
       this.dropY,
       this.config.SKIN_THEME,
-      false
+      false,
+      this.config.BASE_BALL_RADIUS || 16
     );
     ball.vy = 260; // Descente rapide
     this.balls.push(ball);
@@ -217,6 +259,7 @@ export class MergeDropGame implements GameInstance {
   }
 
   private spawnLevel1StreamBall() {
+    if (this.state !== 'RUNNING') return;
     const jitterX = (Math.random() - 0.5) * 10;
     const ball = new MergeBall(
       this.nextBallId++,
@@ -224,7 +267,8 @@ export class MergeDropGame implements GameInstance {
       this.dropX + jitterX,
       this.dropY,
       this.config.SKIN_THEME,
-      false
+      false,
+      this.config.BASE_BALL_RADIUS || 16
     );
     ball.vx = (Math.random() - 0.5) * 20;
     ball.vy = 300 + Math.random() * 80;
@@ -267,20 +311,22 @@ export class MergeDropGame implements GameInstance {
   private updatePhysics(dt: number) {
     this.tubeFlowOffset = (this.tubeFlowOffset + dt * 180) % 30;
 
-    if (!this.canManualDrop) {
-      this.manualDropCooldown -= dt;
-      if (this.manualDropCooldown <= 0) {
-        this.canManualDrop = true;
+    if (this.state === 'RUNNING') {
+      if (!this.canManualDrop) {
+        this.manualDropCooldown -= dt;
+        if (this.manualDropCooldown <= 0) {
+          this.canManualDrop = true;
+        }
       }
-    }
 
-    if (this.isAutoStreaming) {
-      const rate = Math.max(1, this.config.AUTO_STREAM_RATE || 5);
-      const interval = 1.0 / rate;
-      this.autoStreamTimer += dt;
-      while (this.autoStreamTimer >= interval) {
-        this.autoStreamTimer -= interval;
-        this.spawnLevel1StreamBall();
+      if (this.isAutoStreaming) {
+        const rate = Math.max(1, this.config.AUTO_STREAM_RATE || 5);
+        const interval = 1.0 / rate;
+        this.autoStreamTimer += dt;
+        while (this.autoStreamTimer >= interval) {
+          this.autoStreamTimer -= interval;
+          this.spawnLevel1StreamBall();
+        }
       }
     }
 
@@ -404,7 +450,8 @@ export class MergeDropGame implements GameInstance {
                 midX,
                 midY,
                 this.config.SKIN_THEME,
-                true
+                true,
+                this.config.BASE_BALL_RADIUS || 16
               );
               mergedBall.vx = (b1.vx + b2.vx) * 0.35;
               mergedBall.vy = (b1.vy + b2.vy) * 0.35 - 50;
@@ -466,6 +513,37 @@ export class MergeDropGame implements GameInstance {
       this.balls[i].update(dt);
     }
 
+    // 3. Détection du Débordement (Game Over au-dessus de dangerY)
+    let hasOverflowingBall = false;
+    for (let i = 0; i < this.balls.length; i++) {
+      const b = this.balls[i];
+      // La bille doit être stabilisée (age > 1.2s et vy < 85) et son sommet dépasser la ligne rouge
+      if (b.age > 1.2 && (b.y - b.radius) < this.dangerY && b.vy < 85) {
+        hasOverflowingBall = true;
+        break;
+      }
+    }
+
+    if (this.state === 'RUNNING') {
+      if (hasOverflowingBall) {
+        this.isDangerWarning = true;
+        this.overflowTimer += dt;
+        this.dangerSoundCooldown -= dt;
+        if (this.dangerSoundCooldown <= 0) {
+          sound.playDanger();
+          this.dangerSoundCooldown = 0.45;
+        }
+
+        if (this.overflowTimer >= 2.0) {
+          this.triggerGameOver();
+        }
+      } else {
+        this.isDangerWarning = false;
+        this.overflowTimer = Math.max(0, this.overflowTimer - dt * 2);
+        this.dangerSoundCooldown = 0;
+      }
+    }
+
     for (let i = this.sparks.length - 1; i >= 0; i--) {
       this.sparks[i].update(dt);
       if (this.sparks[i].life <= 0) {
@@ -501,7 +579,9 @@ export class MergeDropGame implements GameInstance {
       this.drawTubeChamber();
     }
 
-    this.drawSpawnerPreview();
+    if (this.state === 'RUNNING') {
+      this.drawSpawnerPreview();
+    }
 
     for (let i = 0; i < this.balls.length; i++) {
       this.balls[i].draw(this.ctx);
@@ -509,6 +589,11 @@ export class MergeDropGame implements GameInstance {
 
     for (let i = 0; i < this.sparks.length; i++) {
       this.sparks[i].draw(this.ctx);
+    }
+
+    // Dessin de l'écran Game Over si débordement confirmé
+    if (this.state === 'GAME_OVER') {
+      this.drawGameOverOverlay();
     }
 
     // Dessin du HUD textuel en haut du Canvas (inclus dans la vidéo 9:16)
@@ -538,15 +623,37 @@ export class MergeDropGame implements GameInstance {
     ctx.fill();
 
     // 2. Ligne limite de danger courbée
-    const dangerY = 380;
+    const dangerY = this.dangerY;
+    const pulse = (Math.sin(performance.now() * 0.015) + 1) * 0.5;
+
+    ctx.save();
     ctx.beginPath();
-    ctx.setLineDash([8, 8]);
+    ctx.setLineDash(this.isDangerWarning ? [12, 6] : [8, 8]);
     ctx.moveTo(270 - this.getJarHalfWidth(dangerY), dangerY);
     ctx.lineTo(270 + this.getJarHalfWidth(dangerY), dangerY);
-    ctx.strokeStyle = 'rgba(255, 0, 85, 0.4)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = this.isDangerWarning
+      ? `rgba(255, 0, 85, ${0.85 + pulse * 0.15})`
+      : 'rgba(255, 0, 85, 0.4)';
+    ctx.lineWidth = this.isDangerWarning ? 4 : 2;
+    if (this.isDangerWarning) {
+      ctx.shadowColor = '#ff0055';
+      ctx.shadowBlur = 18;
+    }
     ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Badge d'alerte en cas de danger
+    if (this.isDangerWarning && this.state === 'RUNNING') {
+      ctx.save();
+      const timeLeft = Math.max(0, 2.0 - this.overflowTimer).toFixed(1);
+      ctx.fillStyle = '#ff0055';
+      ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#ff0055';
+      ctx.shadowBlur = 10;
+      ctx.fillText(`⚠️ DANGER: ${timeLeft}s ⚠️`, 270, dangerY - 12);
+      ctx.restore();
+    }
 
     // 3. Parois néon galbées de la jarre
     ctx.beginPath();
@@ -606,15 +713,37 @@ export class MergeDropGame implements GameInstance {
     ctx.fillRect(left, top, this.chamberWidth, bottom - top);
 
     // Ligne limite haute
-    const dangerY = 380;
+    const dangerY = this.dangerY;
+    const pulse = (Math.sin(performance.now() * 0.015) + 1) * 0.5;
+
+    ctx.save();
     ctx.beginPath();
-    ctx.setLineDash([8, 8]);
+    ctx.setLineDash(this.isDangerWarning ? [12, 6] : [8, 8]);
     ctx.moveTo(left, dangerY);
     ctx.lineTo(right, dangerY);
-    ctx.strokeStyle = 'rgba(255, 0, 85, 0.35)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = this.isDangerWarning
+      ? `rgba(255, 0, 85, ${0.85 + pulse * 0.15})`
+      : 'rgba(255, 0, 85, 0.35)';
+    ctx.lineWidth = this.isDangerWarning ? 4 : 2;
+    if (this.isDangerWarning) {
+      ctx.shadowColor = '#ff0055';
+      ctx.shadowBlur = 18;
+    }
     ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Badge d'alerte en cas de danger
+    if (this.isDangerWarning && this.state === 'RUNNING') {
+      ctx.save();
+      const timeLeft = Math.max(0, 2.0 - this.overflowTimer).toFixed(1);
+      ctx.fillStyle = '#ff0055';
+      ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#ff0055';
+      ctx.shadowBlur = 10;
+      ctx.fillText(`⚠️ DANGER: ${timeLeft}s ⚠️`, 270, dangerY - 12);
+      ctx.restore();
+    }
 
     // Cuve
     ctx.beginPath();
@@ -704,6 +833,86 @@ export class MergeDropGame implements GameInstance {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
       ctx.fill();
     }
+
+    ctx.restore();
+  }
+
+  private drawGameOverOverlay() {
+    const ctx = this.ctx;
+    const isEn = this.config.TEXT_METRIC_MAX_TIER === 'MAX PLANET' || this.config.TEXT_METRIC_SCORE === 'SCORE';
+    const tiers = this.getCurrentTiers();
+    const currentMaxTierObj = tiers[this.maxTierReached] || tiers[0];
+    const tierLocalizedName = getTierLocalizedName(currentMaxTierObj, isEn);
+
+    ctx.save();
+    // Voile sombre
+    ctx.fillStyle = 'rgba(8, 4, 16, 0.82)';
+    ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+
+    // Boîte modale stylée au centre
+    const boxW = 430;
+    const boxH = 300;
+    const boxX = (VIRTUAL_WIDTH - boxW) / 2;
+    const boxY = (VIRTUAL_HEIGHT - boxH) / 2 + 10;
+
+    ctx.fillStyle = 'rgba(22, 12, 28, 0.96)';
+    ctx.strokeStyle = '#ff0055';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = 'rgba(255, 0, 85, 0.85)';
+    ctx.shadowBlur = 28;
+
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxW, boxH, 18);
+    ctx.fill();
+    ctx.stroke();
+
+    // Titre GAME OVER
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#ff0055';
+    ctx.font = '900 36px "Inter", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(isEn ? '💥 GAME OVER 💥' : '💥 PARTIE PERDUE 💥', VIRTUAL_WIDTH / 2, boxY + 56);
+
+    // Sous-titre explicatif
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '600 15px "Inter", sans-serif';
+    ctx.fillText(
+      isEn ? 'Overflow! Balls exceeded the danger line' : 'Débordement ! Les billes ont dépassé la ligne rouge',
+      VIRTUAL_WIDTH / 2,
+      boxY + 96
+    );
+
+    // Ligne de séparation
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(boxX + 30, boxY + 118);
+    ctx.lineTo(boxX + boxW - 30, boxY + 118);
+    ctx.stroke();
+
+    // Scores & Récapitulatif
+    ctx.fillStyle = '#00f0ff';
+    ctx.font = 'bold 22px "JetBrains Mono", sans-serif';
+    ctx.fillText(`${isEn ? 'Final Score:' : 'Score Final :'} ${this.score}`, VIRTUAL_WIDTH / 2, boxY + 160);
+
+    ctx.fillStyle = '#ffb300';
+    ctx.font = '600 17px "Inter", sans-serif';
+    ctx.fillText(
+      `${isEn ? 'Max Planet:' : 'Planète Max :'} ${currentMaxTierObj.symbol} ${tierLocalizedName}`,
+      VIRTUAL_WIDTH / 2,
+      boxY + 200
+    );
+
+    // Bouton / Instruction de redémarrage
+    const pulse = (Math.sin(performance.now() * 0.008) + 1) * 0.5;
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.75 + pulse * 0.25})`;
+    ctx.font = 'bold 15px "Inter", sans-serif';
+    ctx.fillText(
+      isEn ? '▶ Click or Press [R] to Restart' : '▶ Cliquez ou Appuyez sur [R] pour Rejouer',
+      VIRTUAL_WIDTH / 2,
+      boxY + 258
+    );
 
     ctx.restore();
   }

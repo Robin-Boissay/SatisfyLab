@@ -219,6 +219,60 @@ export class SoundEngine {
     osc.start(now);
     osc.stop(now + 0.04);
   }
+
+  /**
+   * Bip d'avertissement quand les boules débordent la ligne rouge de danger
+   */
+  public playDanger() {
+    if (!this.ctx || this.isMuted) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(620, now);
+    osc.frequency.exponentialRampToValueAtTime(310, now + 0.08);
+
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain!);
+
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }
+
+  /**
+   * Son dramatique de Game Over / Débordement
+   */
+  public playGameOver() {
+    if (!this.ctx || this.isMuted) return;
+
+    this.playWallDestroy();
+
+    const now = this.ctx.currentTime;
+    const freqs = [180, 140, 95];
+    freqs.forEach((f, idx) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+
+      osc.type = 'sawtooth';
+      const t = now + idx * 0.12;
+      osc.frequency.setValueAtTime(f, t);
+      osc.frequency.exponentialRampToValueAtTime(f * 0.5, t + 0.4);
+
+      gain.gain.setValueAtTime(0.35, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(t);
+      osc.stop(t + 0.45);
+    });
+  }
 }
 
 export const sound = SoundEngine.getInstance();

@@ -271,6 +271,22 @@ export const FIELD_METADATA_TRANSLATIONS: Record<string, Record<Language, { labe
     fr: { label: 'Thème Visuel', description: 'Billes Néon Minimalistes ou Planètes du Système Solaire.' },
     en: { label: 'Visual Theme', description: 'Minimalist Neon or Solar System Planets.' }
   },
+  BASE_BALL_RADIUS: {
+    fr: { label: 'Taille bille minimum (base)', description: 'Rayon de la plus petite bille (niveau 0). Toutes les autres sphères s\'adaptent proportionnellement.' },
+    en: { label: 'Minimum Ball Size (base)', description: 'Base radius of the smallest ball (Tier 0). All other spheres scale proportionally.' }
+  },
+  AUTO_STREAM_ACTIVE: {
+    fr: { label: 'Lancage Automatique (Niveau 1)', description: 'Lâche des billes niveau 1 en continu dans le tube jusqu’à arrêt.' },
+    en: { label: 'Continuous Auto Stream (Tier 1)', description: 'Automatically drops Tier 1 balls continuously into the tube until stopped.' }
+  },
+  AUTO_STREAM_RATE: {
+    fr: { label: 'Cadence de tir (billes/s)', description: 'Nombre de billes lâchées par seconde en mode automatique.' },
+    en: { label: 'Stream Fire Rate (balls/s)', description: 'Number of balls dropped per second in auto stream mode.' }
+  },
+  SPAWN_MAX_TIER: {
+    fr: { label: 'Niveau max des boules (manuel)', description: 'Palier maximal pour les boules lâchées manuellement.' },
+    en: { label: 'Max Spawn Tier (manual)', description: 'Maximum tier for manually dropped balls.' }
+  },
   RESTITUTION: {
     fr: { label: 'Élasticité des rebonds', description: 'Rebondissement lors des contacts.' },
     en: { label: 'Bounce Elasticity', description: 'Restitution coefficient on impacts.' }
