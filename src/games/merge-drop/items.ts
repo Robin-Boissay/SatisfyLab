@@ -19,7 +19,7 @@ export class MergeBall {
   rotSpeed: number = 0;
   age: number = 0; // Temps écoulé depuis l'apparition
   baseRadius: number = 16;
-  hasEnteredJar: boolean = false; // Vrai dès que la bille a franchi la ligne rouge vers le bas
+  hasLanded: boolean = false; // Vrai uniquement quand la bille a touché le fond ou la pile
 
   constructor(
     id: number,
@@ -46,7 +46,7 @@ export class MergeBall {
     if (isNewMerge) {
       this.scale = 1.45; // Pop élastique
       this.flash = 1.0;
-      this.hasEnteredJar = true; // Les fusions ont toujours lieu dans le récipient
+      this.hasLanded = true; // Une bille issue d'une fusion a déjà atterri dans le jeu
     }
   }
 

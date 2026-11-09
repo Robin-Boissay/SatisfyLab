@@ -351,10 +351,6 @@ export class MergeDropGame implements GameInstance {
         b.x += b.vx * subDt;
         b.y += b.vy * subDt;
 
-        if (!b.hasEnteredJar && b.y > this.dangerY) {
-          b.hasEnteredJar = true;
-        }
-
         if (isJar) {
           // --- COLLISIONS DANS LA JARRE ---
           const halfW = this.getJarHalfWidth(b.y);
@@ -373,6 +369,7 @@ export class MergeDropGame implements GameInstance {
             b.y = this.chamberBottom - b.radius;
             b.vy = -b.vy * restitution;
             b.vx *= 0.94;
+            b.hasLanded = true;
           }
         } else {
           // --- COLLISIONS TUBE & CUVE RECTANGULAIRE ---
@@ -418,6 +415,7 @@ export class MergeDropGame implements GameInstance {
               b.y = this.chamberBottom - b.radius;
               b.vy = -b.vy * restitution;
               b.vx *= 0.94;
+              b.hasLanded = true;
             }
           }
         }
@@ -481,6 +479,12 @@ export class MergeDropGame implements GameInstance {
               continue;
             }
 
+            // Propagation du statut d'atterrissage sur le sol ou la pile
+            if (b1.hasLanded || b2.hasLanded) {
+              b1.hasLanded = true;
+              b2.hasLanded = true;
+            }
+
             // Collision élastique
             const nx = dx / dist;
             const ny = dy / dist;
@@ -523,18 +527,17 @@ export class MergeDropGame implements GameInstance {
     let hasOverflowingBall = false;
     for (let i = 0; i < this.balls.length; i++) {
       const b = this.balls[i];
-      // Une bille déborde si elle a déjà pénétré dans le récipient (ou est bloquée en surface depuis > 0.8s)
-      // et que son sommet dépasse au-dessus de la ligne rouge
-      const isInPlay = b.hasEnteredJar || b.age > 0.8;
-      const isAboveDangerLine = (b.y - b.radius) < this.dangerY;
-
-      if (isInPlay && isAboveDangerLine) {
+      // Une bille déborde uniquement si :
+      // 1. Elle a touché le sol ou la pile (hasLanded === true)
+      // 2. Son sommet dépasse au-dessus de la ligne rouge
+      // 3. Elle est posée sur la pile (vy < 80)
+      if (b.hasLanded && (b.y - b.radius * 0.4) < this.dangerY && b.vy < 80) {
         hasOverflowingBall = true;
         break;
       }
     }
 
-    const DANGER_DURATION = 1.3;
+    const DANGER_DURATION = 1.4;
 
     if (this.state === 'RUNNING') {
       const prevDanger = this.isDangerWarning;
@@ -663,7 +666,7 @@ export class MergeDropGame implements GameInstance {
     // Badge d'alerte en cas de danger
     if (this.isDangerWarning && this.state === 'RUNNING') {
       ctx.save();
-      const timeLeft = Math.max(0, 1.3 - this.overflowTimer).toFixed(1);
+      const timeLeft = Math.max(0, 1.4 - this.overflowTimer).toFixed(1);
       ctx.fillStyle = '#ff0055';
       ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
       ctx.textAlign = 'center';
@@ -751,7 +754,7 @@ export class MergeDropGame implements GameInstance {
     // Badge d'alerte en cas de danger
     if (this.isDangerWarning && this.state === 'RUNNING') {
       ctx.save();
-      const timeLeft = Math.max(0, 1.3 - this.overflowTimer).toFixed(1);
+      const timeLeft = Math.max(0, 1.4 - this.overflowTimer).toFixed(1);
       ctx.fillStyle = '#ff0055';
       ctx.font = 'bold 13px "JetBrains Mono", sans-serif';
       ctx.textAlign = 'center';
