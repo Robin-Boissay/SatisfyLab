@@ -6,7 +6,9 @@ import {
   DEFAULT_MERGE_DROP_CONFIG,
   MergeTier,
   getTiersForTheme,
-  getTierLocalizedName
+  getTierLocalizedName,
+  getThemeDefinition,
+  textureManager
 } from './types';
 import { MergeBall, MergeSpark } from './items';
 
@@ -52,12 +54,16 @@ export class MergeDropGame implements GameInstance {
 
   private score: number = 0;
   private maxTierReached: number = 0;
+  private tierUnlockPops: number[] = new Array(10).fill(1.0);
   private nextTier: number = 0;
   private currentHUD: GameHUDState = {};
 
+  // Audio Combos & Effets en Cascade
+  private comboCount: number = 0;
+  private comboTimer: number = 0;
+
   // État du jeu & Gestion du Débordement (Game Over)
   private state: 'RUNNING' | 'GAME_OVER' | 'VICTORY' = 'RUNNING';
-  public readonly dangerY = 380;
   private overflowTimer: number = 0;
   private isDangerWarning: boolean = false;
   private dangerSoundCooldown: number = 0;
@@ -67,26 +73,44 @@ export class MergeDropGame implements GameInstance {
   private climaxTimer: number = 0;
   private timeScale: number = 1.0;
 
-  // Géométrie Générale
+  // Géométrie Générale & Dimensions Dynamiques (Safe Zone TikTok)
   public readonly centerX = 270;
-  public readonly funnelTop = 150;
-  public readonly funnelLeft = 195;
-  public readonly funnelRight = 345;
+  public get funnelTop(): number {
+    return this.config.CONTAINER_TOP_Y ?? 150;
+  }
+  public get chamberBottom(): number {
+    return this.config.CONTAINER_BOTTOM_Y ?? 820;
+  }
+  public get dropY(): number {
+    return this.funnelTop + 15;
+  }
+  public get funnelLeft(): number { return 195; }
+  public get funnelRight(): number { return 345; }
 
   // Tube & Cuve Rectangulaire
-  public readonly tubeLeft = 230;
-  public readonly tubeRight = 310;
-  public readonly tubeTop = 200;
-  public readonly tubeBottom = 290;
-  public readonly chamberLeft = 60;
-  public readonly chamberRight = 480;
-  public readonly chamberWidth = 420;
-  public readonly chamberTop = 290;
-  public readonly chamberBottom = 880;
+  public get tubeLeft(): number { return 230; }
+  public get tubeRight(): number { return 310; }
+  public get tubeTop(): number { return this.funnelTop + 50; }
+  public get tubeBottom(): number { return this.funnelTop + 140; }
+  public get chamberLeft(): number { return 60; }
+  public get chamberRight(): number { return 480; }
+  public get chamberWidth(): number { return 420; }
+  public get chamberTop(): number { return this.tubeBottom; }
+
+  // Ligne de danger dynamique
+  public get dangerY(): number {
+    if (this.config.CONTAINER_SHAPE === 'circle') {
+      const { neckConnectY } = this.getCircleGeometry();
+      return neckConnectY - 25;
+    }
+    const topY = this.funnelTop;
+    const botY = this.chamberBottom;
+    const neckEndY = topY + 140;
+    return neckEndY + Math.min(90, Math.max(35, (botY - neckEndY) * 0.16));
+  }
 
   // Point de largage unique
   public readonly dropX = 270;
-  public readonly dropY = 165;
   private canManualDrop: boolean = true;
   private manualDropCooldown: number = 0;
 
@@ -123,6 +147,7 @@ export class MergeDropGame implements GameInstance {
     window.addEventListener('resize', this.handleResize);
 
     this.syncHUD();
+    textureManager.preloadThemeImages(this.getCurrentTiers());
     this.loop(performance.now());
   }
 
@@ -153,7 +178,25 @@ export class MergeDropGame implements GameInstance {
     }
 
     if (newConfig.SKIN_THEME !== undefined && newConfig.SKIN_THEME !== prevTheme) {
+      const themeDef = getThemeDefinition(this.config.SKIN_THEME);
+      if (themeDef.defaultContainerColor && newConfig.CONTAINER_COLOR === undefined) {
+        this.config.CONTAINER_COLOR = themeDef.defaultContainerColor;
+      }
+      if (themeDef.defaultBackgroundColor && newConfig.BACKGROUND_COLOR === undefined) {
+        this.config.BACKGROUND_COLOR = themeDef.defaultBackgroundColor;
+      }
+      textureManager.preloadThemeImages(this.getCurrentTiers());
       this.balls.forEach((b) => b.setTheme(this.config.SKIN_THEME, this.config.BASE_BALL_RADIUS));
+    }
+
+    if (newConfig.CONTAINER_BOTTOM_Y !== undefined || newConfig.CONTAINER_TOP_Y !== undefined) {
+      const bot = this.chamberBottom;
+      for (const b of this.balls) {
+        if (b.y + b.radius > bot) {
+          b.y = bot - b.radius;
+          b.vy = Math.min(b.vy, 0);
+        }
+      }
     }
 
     this.syncHUD();
@@ -173,6 +216,8 @@ export class MergeDropGame implements GameInstance {
     this.vortexParticles = [];
     this.score = 0;
     this.maxTierReached = 0;
+    this.tierUnlockPops = new Array(10).fill(1.0);
+    this.tierUnlockPops[0] = 1.35;
     this.nextTier = this.getRandomSpawnTier();
     this.canManualDrop = true;
     this.manualDropCooldown = 0;
@@ -248,9 +293,9 @@ export class MergeDropGame implements GameInstance {
     const isEn = this.config.TEXT_METRIC_MAX_TIER === 'MAX PLANET' || this.config.TEXT_METRIC_SCORE === 'SCORE';
     const tiers = this.getCurrentTiers();
     const currentMaxTierObj = tiers[this.maxTierReached] || tiers[0];
-    const isSolar = this.config.SKIN_THEME === 'solar';
+    const themeDef = getThemeDefinition(this.config.SKIN_THEME);
 
-    const title = this.config.TEXT_TITLE || (isSolar ? (isEn ? '🪐 SOLAR SYSTEM' : '🪐 SYSTÈME SOLAIRE') : '⚡ NEON MERGE DROP');
+    const title = this.config.TEXT_TITLE || (isEn ? themeDef.defaultTitleEn : themeDef.defaultTitle);
     let statusText: string | undefined;
 
     if (this.state === 'GAME_OVER') {
@@ -260,11 +305,11 @@ export class MergeDropGame implements GameInstance {
     } else if (this.isDangerWarning) {
       statusText = isEn ? '⚠️ DANGER: OVERFLOW! ⚠️' : '⚠️ DANGER : DÉBORDEMENT ! ⚠️';
     } else if (this.maxTierReached === 9) {
-      statusText = this.config.TEXT_STATUS_VICTORY || (isSolar ? (isEn ? '☀️ SUN CREATED! COSMIC VICTORY ☀️' : '☀️ SOLEIL CRÉÉ ! VICTOIRE COSMIQUE ☀️') : (isEn ? '⭐ ULTIMATE MERGE REACHED! ⭐' : '⭐ FUSION ULTIME ATTEINTE ! ⭐'));
+      statusText = this.config.TEXT_STATUS_VICTORY || (isEn ? themeDef.victoryTextEn : themeDef.victoryText);
     }
 
-    const streamStopLabel = this.config.TEXT_ACTION_STREAM_STOP || (isSolar ? (isEn ? 'STOP ASTEROID STREAM' : 'ARRÊTER RAFALE ASTÉROÏDES') : (isEn ? 'STOP STREAM TIER 1' : 'ARRÊTER RAFALE NIVEAU 1'));
-    const streamStartLabel = this.config.TEXT_ACTION_STREAM_START || (isSolar ? (isEn ? 'LAUNCH ASTEROID STREAM' : 'LANCER RAFALE ASTÉROÏDES') : (isEn ? 'LAUNCH STREAM TIER 1' : 'LANCER RAFALE NIVEAU 1'));
+    const streamStopLabel = this.config.TEXT_ACTION_STREAM_STOP || (isEn ? themeDef.streamStopLabelEn : themeDef.streamStopLabel);
+    const streamStartLabel = this.config.TEXT_ACTION_STREAM_START || (isEn ? themeDef.streamStartLabelEn : themeDef.streamStartLabel);
 
     const tierLocalizedName = getTierLocalizedName(currentMaxTierObj, isEn);
 
@@ -272,11 +317,12 @@ export class MergeDropGame implements GameInstance {
       title,
       primaryMetricLabel: this.config.TEXT_METRIC_SCORE || 'SCORE',
       primaryMetricValue: this.score,
-      secondaryMetricLabel: this.config.TEXT_METRIC_MAX_TIER || (isSolar ? (isEn ? 'MAX PLANET' : 'PLANÈTE MAX') : (isEn ? 'MAX TIER' : 'PALIER MAX')),
+      secondaryMetricLabel: this.config.TEXT_METRIC_MAX_TIER || (isEn ? themeDef.metricMaxLabelEn : themeDef.metricMaxLabel),
       secondaryMetricValue: `${currentMaxTierObj.symbol} ${tierLocalizedName}`,
       statusText,
       extraActionLabel: this.isAutoStreaming ? streamStopLabel : streamStartLabel,
-      extraActionActive: this.isAutoStreaming
+      extraActionActive: this.isAutoStreaming,
+      topOffset: this.config.HUD_TOP_OFFSET !== undefined ? this.config.HUD_TOP_OFFSET : 35
     };
     this.onHUDUpdate(this.currentHUD);
   }
@@ -295,10 +341,25 @@ export class MergeDropGame implements GameInstance {
   public handlePointerMove = (e: MouseEvent | TouchEvent, clientX: number, clientY: number) => { };
   public handlePointerUp = () => { };
 
+  private triggerImpactSound(speed: number) {
+    if (this.config.SOUND_COLLISION_ENABLED === false) return;
+    sound.playImpact(speed, {
+      style: this.config.SOUND_COLLISION_STYLE,
+      volume: this.config.SOUND_COLLISION_VOLUME,
+      pitchMult: this.config.SOUND_PITCH
+    });
+  }
+
   private triggerManualDrop() {
     if (this.state !== 'RUNNING' || !this.canManualDrop) return;
 
-    sound.playDrop();
+    if (this.config.SOUND_DROP_ENABLED !== false) {
+      sound.playDrop({
+        style: this.config.SOUND_MERGE_STYLE,
+        volume: this.config.SOUND_MERGE_VOLUME,
+        pitchMult: this.config.SOUND_PITCH
+      });
+    }
 
     const ball = new MergeBall(
       this.nextBallId++,
@@ -311,6 +372,11 @@ export class MergeDropGame implements GameInstance {
     );
     ball.vy = 260; // Descente rapide
     this.balls.push(ball);
+
+    if (ball.tier > this.maxTierReached) {
+      this.maxTierReached = ball.tier;
+      this.tierUnlockPops[ball.tier] = 1.45;
+    }
 
     this.nextTier = this.getRandomSpawnTier();
     this.canManualDrop = false;
@@ -334,8 +400,12 @@ export class MergeDropGame implements GameInstance {
     this.balls.push(ball);
 
     this.autoStreamBallsDropped++;
-    if (this.autoStreamBallsDropped % 3 === 0) {
-      sound.playDrop();
+    if (this.config.SOUND_DROP_ENABLED !== false && this.autoStreamBallsDropped % 3 === 0) {
+      sound.playDrop({
+        style: this.config.SOUND_MERGE_STYLE,
+        volume: (this.config.SOUND_MERGE_VOLUME ?? 0.8) * 0.7,
+        pitchMult: this.config.SOUND_PITCH
+      });
     }
   }
 
@@ -345,17 +415,41 @@ export class MergeDropGame implements GameInstance {
   }
 
   /**
+   * Calcul géométrique de la Fiole sphérique avec col vertical
+   */
+  public getCircleGeometry() {
+    const cX = 270;
+    const botY = this.chamberBottom;
+    const topY = this.funnelTop;
+    const neckHalfW = 45;
+    // Rayon dynamique s'adaptant à la hauteur disponible
+    const R = Math.max(130, Math.min(225, (botY - topY - 110) * 0.52));
+    const cY = botY - R;
+    const neckConnectY = cY - Math.sqrt(Math.max(1, R * R - neckHalfW * neckHalfW));
+    const delta = Math.asin(Math.min(0.99, neckHalfW / R));
+    const thetaLeft = -Math.PI / 2 - delta;
+    const thetaRight = -Math.PI / 2 + delta;
+    return { cX, cY, R, neckHalfW, neckConnectY, delta, thetaLeft, thetaRight, circleBottom: botY };
+  }
+
+  /**
    * Profil mathématique de la Jarre galbée (demi-largeur en fonction de Y)
    */
   public getJarHalfWidth(y: number): number {
-    if (y < 200) {
-      const t = Math.max(0, Math.min(1, (y - this.funnelTop) / (200 - this.funnelTop)));
+    const topY = this.funnelTop;
+    const botY = this.chamberBottom;
+    const funnelEndY = topY + 50;
+    const neckEndY = topY + 140;
+
+    if (y < funnelEndY) {
+      const t = Math.max(0, Math.min(1, (y - topY) / (funnelEndY - topY)));
       return 75 - t * 35; // 75 -> 40
     }
-    if (y <= 290) {
+    if (y <= neckEndY) {
       return 40; // Col de la jarre (diamètre 80px)
     }
-    const t = Math.max(0, Math.min(1, (y - 290) / (this.chamberBottom - 290))); // 0 -> 1
+    const chamberH = Math.max(40, botY - neckEndY);
+    const t = Math.max(0, Math.min(1, (y - neckEndY) / chamberH)); // 0 -> 1
     if (t < 0.5) {
       const p = t / 0.5;
       const s = Math.sin((p * Math.PI) / 2);
@@ -371,6 +465,11 @@ export class MergeDropGame implements GameInstance {
    * Profil mathématique du Conteneur Personnalisable sur-mesure
    */
   public getCustomHalfWidth(y: number): number {
+    const topY = this.funnelTop;
+    const botY = this.chamberBottom;
+    const funnelEndY = topY + 50;
+    const neckEndY = topY + 140;
+
     const neckW = Math.max(35, this.config.CUSTOM_NECK_WIDTH || 45);
     const bellyW = Math.max(40, this.config.CUSTOM_BELLY_WIDTH || 135);
     const bellyPos = Math.max(0.15, Math.min(0.85, this.config.CUSTOM_BELLY_POSITION || 0.55));
@@ -380,19 +479,19 @@ export class MergeDropGame implements GameInstance {
     const waveAmp = Math.max(0, this.config.CUSTOM_WAVE_AMPLITUDE || 0);
 
     // Entonnoir supérieur de largage
-    if (y < 200) {
-      const t = Math.max(0, Math.min(1, (y - this.funnelTop) / (200 - this.funnelTop)));
+    if (y < funnelEndY) {
+      const t = Math.max(0, Math.min(1, (y - topY) / (funnelEndY - topY)));
       const topW = Math.max(75, neckW + 15);
       return topW - t * (topW - neckW);
     }
     // Col de passage
-    if (y <= 290) {
+    if (y <= neckEndY) {
       return neckW;
     }
 
     // Cuve principale personnalisée
-    const chamberH = this.chamberBottom - 290;
-    const t = Math.max(0, Math.min(1, (y - 290) / chamberH));
+    const chamberH = Math.max(40, botY - neckEndY);
+    const t = Math.max(0, Math.min(1, (y - neckEndY) / chamberH));
 
     let baseW: number;
     if (t < bellyPos) {
@@ -420,18 +519,22 @@ export class MergeDropGame implements GameInstance {
    * Profil mathématique de la Fiole ronde avec tube vertical (demi-largeur en fonction de Y)
    */
   public getCircleHalfWidth(y: number): number {
-    if (y < 200) {
-      const t = Math.max(0, Math.min(1, (y - this.funnelTop) / (200 - this.funnelTop)));
-      return 80 - t * 35; // 80 -> 45
+    const { cY, R, neckHalfW, neckConnectY } = this.getCircleGeometry();
+    const topY = this.funnelTop;
+    const funnelEndY = topY + 50;
+
+    if (y < funnelEndY) {
+      const t = Math.max(0, Math.min(1, (y - topY) / (funnelEndY - topY)));
+      return 80 - t * (80 - neckHalfW); // 80 -> 45
     }
-    if (y <= 419.5) {
-      return 45; // Tube vertical d'entrée (diamètre 90px)
+    if (y <= neckConnectY) {
+      return neckHalfW; // Tube vertical d'entrée (diamètre 90px)
     }
-    const dy = Math.abs(y - 640);
-    if (dy >= 225) {
+    const dy = Math.abs(y - cY);
+    if (dy >= R) {
       return 20;
     }
-    return Math.sqrt(225 * 225 - dy * dy);
+    return Math.sqrt(Math.max(0, R * R - dy * dy));
   }
 
   /**
@@ -614,6 +717,13 @@ export class MergeDropGame implements GameInstance {
       }
     }
 
+    if (this.comboTimer > 0) {
+      this.comboTimer -= dt;
+      if (this.comboTimer <= 0) {
+        this.comboCount = 0;
+      }
+    }
+
     const subSteps = 6;
     const subDt = effectiveDt / subSteps;
     const gravityAccel = this.config.GRAVITY * 2600;
@@ -641,12 +751,7 @@ export class MergeDropGame implements GameInstance {
 
         if (this.config.CONTAINER_SHAPE === 'circle') {
           // --- COLLISIONS FIOLE RONDE & TUBE VERTICAL ---
-          const cX = 270;
-          const cY = 640;
-          const R = 225;
-          const neckHalfW = 45;
-          const neckConnectY = 419.5;
-          const circleBottom = cY + R; // 865
+          const { cX, cY, R, neckHalfW, neckConnectY, circleBottom } = this.getCircleGeometry();
 
           if (b.y <= neckConnectY) {
             // Dans le tube vertical ou l'entonnoir
@@ -696,6 +801,8 @@ export class MergeDropGame implements GameInstance {
 
           // Filet de sécurité absolu au fond du bocal
           if (b.y + b.radius > circleBottom) {
+            const spd = Math.abs(b.vy);
+            if (spd > 70) this.triggerImpactSound(spd);
             b.y = circleBottom - b.radius;
             b.vy = -Math.abs(b.vy) * restitution * 0.5;
             b.hasLanded = true;
@@ -708,9 +815,13 @@ export class MergeDropGame implements GameInstance {
 
           if (b.x < minX) {
             b.x = minX;
+            const spd = Math.abs(b.vx);
+            if (spd > 75) this.triggerImpactSound(spd);
             b.vx = Math.abs(b.vx) * restitution + 10;
           } else if (b.x > maxX) {
             b.x = maxX;
+            const spd = Math.abs(b.vx);
+            if (spd > 75) this.triggerImpactSound(spd);
             b.vx = -Math.abs(b.vx) * restitution - 10;
           }
 
@@ -735,6 +846,7 @@ export class MergeDropGame implements GameInstance {
 
               const vNormal = b.vx * nx + b.vy * ny;
               if (vNormal < 0) {
+                if (-vNormal > 70) this.triggerImpactSound(-vNormal);
                 b.vx -= (1 + restitution) * vNormal * nx;
                 b.vy -= (1 + restitution) * vNormal * ny;
               }
@@ -745,6 +857,8 @@ export class MergeDropGame implements GameInstance {
             }
           } else {
             if (b.y + b.radius > this.chamberBottom) {
+              const spd = Math.abs(b.vy);
+              if (spd > 70) this.triggerImpactSound(spd);
               b.y = this.chamberBottom - b.radius;
               b.vy = -b.vy * restitution;
               b.vx *= 0.94;
@@ -844,7 +958,12 @@ export class MergeDropGame implements GameInstance {
           // Test de collision géométrique réel
           if (distSq < minDistSq && distSq > 0) {
             // Fusion
-            if (b1.tier === b2.tier && b1.tier < currentTiers.length - 1) {
+            if (
+              b1.tier === b2.tier &&
+              b1.tier < currentTiers.length - 1 &&
+              b1.mergeCooldown <= 0 &&
+              b2.mergeCooldown <= 0
+            ) {
               toRemove.add(b1.id);
               toRemove.add(b2.id);
 
@@ -866,12 +985,26 @@ export class MergeDropGame implements GameInstance {
 
               toAdd.push(mergedBall);
 
-              sound.playMerge(nextTier);
+              this.comboCount++;
+              this.comboTimer = 0.55; // Fenêtre de cascade active
+
+              if (this.config.SOUND_MERGE_ENABLED !== false) {
+                sound.playMerge(nextTier, {
+                  style: this.config.SOUND_MERGE_STYLE,
+                  volume: this.config.SOUND_MERGE_VOLUME,
+                  comboIndex: this.config.SOUND_COMBO_PITCH !== false ? this.comboCount - 1 : 0,
+                  pitchMult: this.config.SOUND_PITCH
+                });
+              }
 
               const pts = currentTiers[nextTier].points;
               this.score += pts;
               if (nextTier > this.maxTierReached) {
                 this.maxTierReached = nextTier;
+                this.tierUnlockPops[nextTier] = 1.55;
+                if (this.config.SOUND_MERGE_ENABLED !== false) {
+                  sound.playTierUnlock(nextTier, this.config.SOUND_MERGE_STYLE, this.config.SOUND_PITCH);
+                }
               }
 
               // Déclenchement grandiose si création de l'astre ultime (Le Soleil / Tier 9) !
@@ -888,7 +1021,7 @@ export class MergeDropGame implements GameInstance {
               }
 
               hadMergeThisFrame = true;
-              continue;
+              break;
             }
 
             // Propagation du statut d'atterrissage sur le sol ou la pile
@@ -913,11 +1046,7 @@ export class MergeDropGame implements GameInstance {
 
             // Re-stabilisation dans les parois pour éviter tout bug d'enfoncement
             if (this.config.CONTAINER_SHAPE === 'circle') {
-              const cX = 270;
-              const cY = 640;
-              const R = 225;
-              const neckHalfW = 45;
-              const neckConnectY = 419.5;
+              const { cX, cY, R, neckHalfW, neckConnectY } = this.getCircleGeometry();
               for (const ball of [b1, b2]) {
                 const dx = ball.x - cX;
                 const dy = ball.y - cY;
@@ -948,6 +1077,9 @@ export class MergeDropGame implements GameInstance {
             const velAlongNormal = rvx * nx + rvy * ny;
 
             if (velAlongNormal < 0) {
+              if (-velAlongNormal > 65) {
+                this.triggerImpactSound(-velAlongNormal);
+              }
               const impulse = -(1 + restitution) * velAlongNormal / (1 / m1 + 1 / m2);
               b1.vx -= (impulse / m1) * nx;
               b1.vy -= (impulse / m1) * ny;
@@ -1045,6 +1177,13 @@ export class MergeDropGame implements GameInstance {
       vp.y += (vp.targetY - vp.y) * dt * 4.0;
       if (vp.progress >= 1.0) {
         this.vortexParticles.splice(i, 1);
+      }
+    }
+
+    // Décroissance des pops d'animation de la frise d'évolution
+    for (let i = 0; i < 10; i++) {
+      if (this.tierUnlockPops[i] > 1.0) {
+        this.tierUnlockPops[i] = Math.max(1.0, this.tierUnlockPops[i] - 2.5 * dt);
       }
     }
 
@@ -1158,8 +1297,13 @@ export class MergeDropGame implements GameInstance {
       this.drawVictoryOverlay();
     }
 
+    // Frise d'évolution des 10 paliers sous le bocal
+    this.drawEvolutionBar();
+
     // Dessin du HUD textuel en haut du Canvas (inclus dans la vidéo 9:16)
-    drawCanvasHUD(this.ctx, this.currentHUD, VIRTUAL_WIDTH);
+    if (this.config.SHOW_TOP_HUD !== false) {
+      drawCanvasHUD(this.ctx, this.currentHUD, VIRTUAL_WIDTH);
+    }
 
     this.ctx.restore();
   }
@@ -1318,23 +1462,17 @@ export class MergeDropGame implements GameInstance {
 
     const themeColor = this.config.CONTAINER_COLOR || '#00f0ff';
     const accentColor = this.getContainerAccentColor(0.4);
-    const cX = 270;
-    const cY = 640;
-    const R = 225;
-    const neckHalfW = 45;
-    const neckConnectY = 419.5;
-    const delta = Math.asin(neckHalfW / R);
-    const thetaLeft = -Math.PI / 2 - delta;
-    const thetaRight = -Math.PI / 2 + delta;
+    const { cX, cY, R, neckHalfW, neckConnectY, thetaLeft, thetaRight } = this.getCircleGeometry();
+    const funnelEndY = this.funnelTop + 50;
 
     // 1. Fond teinté de la fiole (remplissage complet de la sphère et du col)
     ctx.beginPath();
     ctx.moveTo(cX - 80, this.funnelTop);
-    ctx.lineTo(cX - neckHalfW, 200);
+    ctx.lineTo(cX - neckHalfW, funnelEndY);
     ctx.lineTo(cX - neckHalfW, neckConnectY);
     // Arc circulaire de thetaLeft à thetaRight passant par le bas (anticlockwise: true)
     ctx.arc(cX, cY, R, thetaLeft, thetaRight, true);
-    ctx.lineTo(cX + neckHalfW, 200);
+    ctx.lineTo(cX + neckHalfW, funnelEndY);
     ctx.lineTo(cX + 80, this.funnelTop);
     ctx.closePath();
     ctx.fillStyle = 'rgba(14, 20, 34, 0.65)';
@@ -1372,23 +1510,25 @@ export class MergeDropGame implements GameInstance {
     // 3. Parois néon de la fiole (traits vectoriels nets dessinant la sphère complète)
     ctx.beginPath();
     ctx.moveTo(cX - 80, this.funnelTop);
-    ctx.lineTo(cX - neckHalfW, 200);
+    ctx.lineTo(cX - neckHalfW, funnelEndY);
     ctx.lineTo(cX - neckHalfW, neckConnectY);
     ctx.arc(cX, cY, R, thetaLeft, thetaRight, true);
-    ctx.lineTo(cX + neckHalfW, 200);
+    ctx.lineTo(cX + neckHalfW, funnelEndY);
     ctx.lineTo(cX + 80, this.funnelTop);
 
     // Contour principal
+    const strokeW = Math.max(1, this.config.CONTAINER_STROKE_WIDTH || 4.5);
     ctx.strokeStyle = themeColor;
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 1.6;
+    ctx.shadowColor = themeColor;
+    ctx.shadowBlur = Math.min(20, strokeW * 2.5);
+    ctx.lineWidth = strokeW;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Cœur blanc pur ultra-fin
+    // Cœur blanc pur
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.lineWidth = 0.7;
+    ctx.lineWidth = Math.max(1, strokeW * 0.3);
     ctx.stroke();
 
     // Reflet de verre courbé esthétique sur la fiole
@@ -1492,22 +1632,24 @@ export class MergeDropGame implements GameInstance {
 
     // Contour principal épuré
     const themeColor = this.config.CONTAINER_COLOR || '#00f0ff';
+    const strokeW = Math.max(1, this.config.CONTAINER_STROKE_WIDTH || 4.5);
     ctx.strokeStyle = themeColor;
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 1.6;
+    ctx.shadowColor = themeColor;
+    ctx.shadowBlur = Math.min(20, strokeW * 2.5);
+    ctx.lineWidth = strokeW;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Cœur blanc pur ultra-fin
+    // Cœur blanc pur
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.lineWidth = 0.7;
+    ctx.lineWidth = Math.max(1, strokeW * 0.3);
     ctx.stroke();
 
     // Graduations holographiques sur le flanc droit pour le style laboratoire
     ctx.strokeStyle = this.getContainerAccentColor(0.35);
     ctx.lineWidth = 1.0;
-    for (let y = 340; y <= this.chamberBottom - 30; y += 45) {
+    for (let y = this.chamberTop + 50; y <= this.chamberBottom - 30; y += 45) {
       const hw = this.getCustomHalfWidth(y);
       ctx.beginPath();
       ctx.moveTo(270 + hw - 10, y);
@@ -1583,16 +1725,18 @@ export class MergeDropGame implements GameInstance {
 
     // Contour principal épuré
     const themeColor = this.config.CONTAINER_COLOR || '#00f0ff';
+    const strokeW = Math.max(1, this.config.CONTAINER_STROKE_WIDTH || 4.5);
     ctx.strokeStyle = themeColor;
-    ctx.shadowBlur = 0; // Finis les traits baveux énormes
-    ctx.lineWidth = 1.6;
+    ctx.shadowColor = themeColor;
+    ctx.shadowBlur = Math.min(20, strokeW * 2.5);
+    ctx.lineWidth = strokeW;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Cœur blanc pur ultra-fin
+    // Cœur blanc pur
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.lineWidth = 0.7;
+    ctx.lineWidth = Math.max(1, strokeW * 0.3);
     ctx.stroke();
 
     // Anses décoratives de la Jarre (gauche et droite)
@@ -1664,15 +1808,17 @@ export class MergeDropGame implements GameInstance {
     ctx.lineTo(this.tubeRight, top);
 
     const themeColor = this.config.CONTAINER_COLOR || '#00f0ff';
+    const strokeW = Math.max(1, this.config.CONTAINER_STROKE_WIDTH || 4.5);
     ctx.strokeStyle = themeColor;
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 1.6;
+    ctx.shadowColor = themeColor;
+    ctx.shadowBlur = Math.min(20, strokeW * 2.5);
+    ctx.lineWidth = strokeW;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.lineWidth = 0.7;
+    ctx.lineWidth = Math.max(1, strokeW * 0.3);
     ctx.stroke();
 
     // Fût du tube
@@ -1691,10 +1837,271 @@ export class MergeDropGame implements GameInstance {
     ctx.restore();
   }
 
+  /**
+   * Dessine la frise d'évolution des 10 paliers (configurable en 1 ligne ou 2 lignes de 5 géants, position Y et taille réglables).
+   */
+  private drawEvolutionBar() {
+    if (this.config.SHOW_EVOLUTION_BAR === false) return;
+
+    const ctx = this.ctx;
+    const tiers = this.getCurrentTiers();
+    if (!tiers || tiers.length === 0) return;
+
+    ctx.save();
+
+    const is2Rows = this.config.EVOLUTION_BAR_LAYOUT === '2rows';
+    const baseR = this.config.EVOLUTION_BAR_SIZE !== undefined ? this.config.EVOLUTION_BAR_SIZE : (is2Rows ? 22 : 19);
+    const themeColor = this.config.CONTAINER_COLOR || '#00f0ff';
+    const userY = this.config.EVOLUTION_BAR_Y !== undefined ? this.config.EVOLUTION_BAR_Y : 125;
+
+    if (is2Rows) {
+      // --- MODE 2 LIGNES (5 × 2 CERCLES GÉANTS - Ultra lisible TikTok) ---
+      const barW = 350;
+      const barH = baseR * 4 + 28;
+      const barX = (540 - barW) / 2;
+      const barY = userY;
+      const barR = 18;
+
+      ctx.beginPath();
+      if (typeof (ctx as any).roundRect === 'function') {
+        (ctx as any).roundRect(barX, barY, barW, barH, barR);
+      } else {
+        ctx.rect(barX, barY, barW, barH);
+      }
+      ctx.fillStyle = 'rgba(6, 10, 20, 0.85)';
+      ctx.fill();
+
+      ctx.strokeStyle = themeColor;
+      ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+
+      const cols = 5;
+      const stepX = (barW - 48) / (cols - 1);
+      const startX = barX + 24;
+      const cyRow1 = barY + baseR + 10;
+      const cyRow2 = barY + baseR * 3 + 18;
+
+      // Rails de connexion
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(startX, cyRow1);
+      ctx.lineTo(startX + 4 * stepX, cyRow1);
+      ctx.moveTo(startX, cyRow2);
+      ctx.lineTo(startX + 4 * stepX, cyRow2);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Rail actif ligne 1
+      if (this.maxTierReached > 0) {
+        const endCol1 = Math.min(4, this.maxTierReached);
+        ctx.beginPath();
+        ctx.moveTo(startX, cyRow1);
+        ctx.lineTo(startX + endCol1 * stepX, cyRow1);
+        ctx.strokeStyle = themeColor;
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = themeColor;
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+      }
+      // Rail actif ligne 2
+      if (this.maxTierReached >= 5) {
+        const endCol2 = Math.min(4, this.maxTierReached - 5);
+        ctx.beginPath();
+        ctx.moveTo(startX, cyRow2);
+        ctx.lineTo(startX + endCol2 * stepX, cyRow2);
+        ctx.strokeStyle = themeColor;
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = themeColor;
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 10 Cercles
+      for (let i = 0; i < 10; i++) {
+        const col = i % 5;
+        const row = Math.floor(i / 5);
+        const cx = startX + col * stepX;
+        const cy = row === 0 ? cyRow1 : cyRow2;
+        this.renderEvolutionCircle(ctx, i, cx, cy, baseR, tiers[i], themeColor);
+      }
+    } else {
+      // --- MODE 1 LIGNE (10 CERCLES ALIGNÉS) ---
+      const barW = 514;
+      const barH = baseR * 2 + 16;
+      const barX = (540 - barW) / 2;
+      const barY = userY;
+      const barR = barH / 2;
+
+      ctx.beginPath();
+      if (typeof (ctx as any).roundRect === 'function') {
+        (ctx as any).roundRect(barX, barY, barW, barH, barR);
+      } else {
+        ctx.rect(barX, barY, barW, barH);
+      }
+      ctx.fillStyle = 'rgba(6, 10, 20, 0.85)';
+      ctx.fill();
+
+      ctx.strokeStyle = themeColor;
+      ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+
+      const stepX = (barW - (baseR * 2 + 16)) / 9;
+      const startX = barX + baseR + 8;
+      const cy = barY + barH / 2;
+
+      // Rail arrière
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(startX, cy);
+      ctx.lineTo(startX + 9 * stepX, cy);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Rail actif
+      if (this.maxTierReached > 0) {
+        ctx.beginPath();
+        ctx.moveTo(startX, cy);
+        ctx.lineTo(startX + this.maxTierReached * stepX, cy);
+        ctx.strokeStyle = themeColor;
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = themeColor;
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 10 Cercles
+      for (let i = 0; i < 10; i++) {
+        const cx = startX + i * stepX;
+        this.renderEvolutionCircle(ctx, i, cx, cy, baseR, tiers[i], themeColor);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Rendu unitaire d'un cercle dans la frise d'évolution
+   */
+  private renderEvolutionCircle(
+    ctx: CanvasRenderingContext2D,
+    i: number,
+    cx: number,
+    cy: number,
+    baseR: number,
+    tierData: MergeTier,
+    themeColor: string
+  ) {
+    if (!tierData) return;
+    const isUnlocked = i <= this.maxTierReached;
+    const isCurrentMax = i === this.maxTierReached;
+    const pop = this.tierUnlockPops[i] || 1.0;
+    const r = baseR * pop;
+
+    if (isUnlocked) {
+      // --- CERCLE DÉBLOQUÉ ---
+      ctx.save();
+      ctx.shadowColor = isCurrentMax ? (tierData.glowColor || themeColor) : 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = isCurrentMax ? 16 : 5;
+
+      // Disque de base coloré
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = tierData.color || '#00f0ff';
+      ctx.fill();
+
+      // Affichage de l'image si présente et chargée
+      const img = tierData.image ? textureManager.getImage(tierData.image) : null;
+      if (img) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, cx - r, cy - r, r * 2, r * 2);
+        ctx.restore();
+      } else {
+        // Fallback : Symbole / Emoji centré
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.max(10, Math.round(r * 0.95))}px 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'Inter', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 3;
+        ctx.shadowColor = '#000000';
+        ctx.fillText(tierData.symbol, cx, cy + 1);
+      }
+
+      // Contour net
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = isCurrentMax ? '#ffffff' : 'rgba(255, 255, 255, 0.55)';
+      ctx.lineWidth = isCurrentMax ? 2.2 : 1.2;
+      ctx.stroke();
+
+      // Pulsation sur le palier max actuel
+      if (isCurrentMax) {
+        const pulse = (Math.sin(performance.now() * 0.007) + 1) * 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 2.5 + pulse, 0, Math.PI * 2);
+        ctx.strokeStyle = tierData.glowColor || themeColor;
+        ctx.lineWidth = 1.8;
+        ctx.shadowColor = tierData.glowColor || themeColor;
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+      }
+
+      // Couronne au-dessus du tier 9 si débloqué
+      if (i === 9) {
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 12px "Inter", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 8;
+        ctx.fillText('👑', cx, cy - r - 7);
+      }
+
+      ctx.restore();
+    } else {
+      // --- CERCLE VERROUILLÉ ---
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(12, 18, 30, 0.72)';
+      ctx.fill();
+
+      ctx.strokeStyle = i === 9 ? 'rgba(255, 215, 0, 0.4)' : 'rgba(255, 255, 255, 0.16)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Teasing de contenu
+      if (i === 9) {
+        // Boss final : petite couronne dorée estompée
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.45)';
+        ctx.font = 'bold 11px "Inter", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('👑', cx, cy);
+      } else {
+        // Paliers normaux : point d'interrogation discret
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.font = 'bold 11px "JetBrains Mono", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('?', cx, cy + 1);
+      }
+      ctx.restore();
+    }
+  }
+
   private drawSpawnerPreview() {
     const ctx = this.ctx;
     const tiers = this.getCurrentTiers();
-    const tierData = tiers[this.nextTier];
+    const tierData = tiers[this.nextTier] || tiers[0];
 
     ctx.save();
     ctx.translate(this.dropX, this.dropY);
@@ -1713,31 +2120,67 @@ export class MergeDropGame implements GameInstance {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('⚡ STREAM', 0, 0);
-    } else if (this.canManualDrop) {
-      ctx.beginPath();
-      ctx.arc(0, 0, tierData.radius * 1.3, 0, Math.PI * 2);
-      ctx.fillStyle = tierData.glowColor;
-      ctx.globalAlpha = 0.35;
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(0, 0, tierData.radius, 0, Math.PI * 2);
-      ctx.fillStyle = tierData.color;
-      ctx.shadowColor = tierData.glowColor;
-      ctx.shadowBlur = 12;
-      ctx.globalAlpha = 0.9;
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.max(10, Math.round(tierData.radius * 0.52))}px 'Inter', sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.shadowBlur = 0;
-      ctx.fillText(tierData.symbol, 0, 1);
     } else {
+      // Bille prête à tomber : rendu identique et net à 100%
+      const img = tierData.image ? textureManager.getImage(tierData.image) : null;
+      const r = tierData.radius;
+
+      // Animation fluide d'apparition lors du cooldown
+      const isCooldown = !this.canManualDrop;
+      const cooldownRatio = isCooldown ? Math.max(0, this.manualDropCooldown / 0.35) : 0;
+      const scale = isCooldown ? 0.7 + 0.3 * (1 - cooldownRatio) : 1.0;
+
+      ctx.scale(scale, scale);
+
+      if (img) {
+        // 1. Halo lumineux doux sous la bille
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.2, 0, Math.PI * 2);
+        const aura = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 1.2);
+        aura.addColorStop(0, tierData.glowColor || 'rgba(255, 255, 255, 0.35)');
+        aura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = aura;
+        ctx.globalAlpha = 0.5;
+        ctx.fill();
+        ctx.restore();
+
+        // 2. Découpe circulaire parfaite & rendu image 100% net (sans transparence ni décoloration)
+        const drawR = r * 0.98;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0, 0, drawR, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, -drawR, -drawR, drawR * 2, drawR * 2);
+        ctx.restore();
+
+        // 3. Liseré fin d'accentuation
+        ctx.beginPath();
+        ctx.arc(0, 0, drawR, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      } else {
+        // Thèmes procéduraux (Système Solaire, Néon, Minéraux, etc.) : rendu exact MergeBall
+        const previewBall = new MergeBall(
+          -1,
+          this.nextTier,
+          0,
+          0,
+          this.config.SKIN_THEME,
+          false,
+          this.config.BASE_BALL_RADIUS || 16
+        );
+        previewBall.draw(ctx);
+      }
+
+      // Indicateur discret de largage
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.beginPath();
-      ctx.arc(0, 0, 8, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.moveTo(0, r + 8);
+      ctx.lineTo(-4, r + 3);
+      ctx.lineTo(4, r + 3);
+      ctx.closePath();
       ctx.fill();
     }
 

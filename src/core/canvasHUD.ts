@@ -14,13 +14,17 @@ export function drawCanvasHUD(
 
   ctx.save();
 
+  const topOffset = hud.topOffset || 0;
+
   // 1. Dégradé sombre d'arrière-plan en haut pour contraster avec les éléments du jeu
-  const topGrad = ctx.createLinearGradient(0, 0, 0, 140);
+  const topGrad = ctx.createLinearGradient(0, 0, 0, 140 + topOffset);
   topGrad.addColorStop(0, 'rgba(6, 8, 13, 0.92)');
   topGrad.addColorStop(0.7, 'rgba(6, 8, 13, 0.65)');
   topGrad.addColorStop(1, 'rgba(6, 8, 13, 0)');
   ctx.fillStyle = topGrad;
-  ctx.fillRect(0, 0, virtualWidth, 140);
+  ctx.fillRect(0, 0, virtualWidth, 140 + topOffset);
+
+  ctx.translate(0, topOffset);
 
   const centerX = virtualWidth / 2;
 

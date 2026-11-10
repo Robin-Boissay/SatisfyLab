@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ConfigSchema, RangeConfigField, StringConfigField } from '../core/types';
 import { useLanguage } from '../core/i18n';
-import { RotateCcw, Sliders, Activity, Eye, Type } from 'lucide-react';
+import { RotateCcw, Sliders, Activity, Eye, Type, Volume2 } from 'lucide-react';
 
 export interface DynamicControlsProps {
   schema: ConfigSchema;
@@ -9,8 +9,8 @@ export interface DynamicControlsProps {
   defaultValues: Record<string, any>;
   onChange: (key: string, value: any) => void;
   onReset?: () => void;
-  allowedCategories?: ('gameplay' | 'physics' | 'visuals' | 'texts')[];
-  defaultTab?: 'all' | 'gameplay' | 'physics' | 'visuals' | 'texts';
+  allowedCategories?: ('gameplay' | 'physics' | 'visuals' | 'texts' | 'audio')[];
+  defaultTab?: 'all' | 'gameplay' | 'physics' | 'visuals' | 'texts' | 'audio';
   showReset?: boolean;
 }
 
@@ -18,21 +18,24 @@ const CATEGORY_ICONS: Record<string, React.FC<{ className?: string }>> = {
   gameplay: Sliders,
   physics: Activity,
   visuals: Eye,
-  texts: Type
+  texts: Type,
+  audio: Volume2
 };
 
 const CATEGORY_NAMES_FR: Record<string, string> = {
   gameplay: 'Gameplay & Règles',
   physics: 'Moteur Physique',
   visuals: 'Visuels & Conteneur',
-  texts: 'Textes & Titres'
+  texts: 'Textes & Titres',
+  audio: 'Sons & Audio ASMR'
 };
 
 const CATEGORY_NAMES_EN: Record<string, string> = {
   gameplay: 'Gameplay & Rules',
   physics: 'Physics Engine',
   visuals: 'Visuals & Container',
-  texts: 'Texts & Titles'
+  texts: 'Texts & Titles',
+  audio: 'Sounds & ASMR Audio'
 };
 
 export const DynamicControls: React.FC<DynamicControlsProps> = ({
@@ -46,7 +49,7 @@ export const DynamicControls: React.FC<DynamicControlsProps> = ({
   showReset = true
 }) => {
   const { language, t, getFieldMeta } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'all' | 'gameplay' | 'physics' | 'visuals' | 'texts'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'all' | 'gameplay' | 'physics' | 'visuals' | 'texts' | 'audio'>(defaultTab);
 
   const allFields = Object.values(schema);
 
@@ -67,7 +70,7 @@ export const DynamicControls: React.FC<DynamicControlsProps> = ({
   // Catégories effectivement présentes dans ce panneau
   const presentCategories = Array.from(
     new Set(availableFields.map((f) => f.category))
-  ) as ('gameplay' | 'physics' | 'visuals' | 'texts')[];
+  ) as ('gameplay' | 'physics' | 'visuals' | 'texts' | 'audio')[];
 
   const showCategoryTabs = presentCategories.length > 1;
 

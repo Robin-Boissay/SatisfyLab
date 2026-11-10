@@ -1,4 +1,4 @@
-import { MergeTier, SkinTheme, getTiersForTheme } from './types';
+import { MergeTier, SkinTheme, getTiersForTheme, getThemeDefinition, textureManager } from './types';
 
 export class MergeBall {
   id: number;
@@ -15,6 +15,7 @@ export class MergeBall {
   targetScale: number = 1.0;
   flash: number = 0;
   isMerging: boolean = false;
+  mergeCooldown: number = 0;
   rotation: number = 0;
   rotSpeed: number = 0;
   age: number = 0; // Temps écoulé depuis l'apparition
@@ -47,6 +48,7 @@ export class MergeBall {
       this.scale = 1.45; // Pop élastique
       this.flash = 1.0;
       this.hasLanded = true; // Une bille issue d'une fusion a déjà atterri dans le jeu
+      this.mergeCooldown = 0.16; // Délai d'immunité anti-fusion multiple instantanée
     }
   }
 
@@ -76,6 +78,9 @@ export class MergeBall {
     if (this.flash > 0) {
       this.flash = Math.max(0, this.flash - 4.0 * dt);
     }
+    if (this.mergeCooldown > 0) {
+      this.mergeCooldown = Math.max(0, this.mergeCooldown - dt);
+    }
   }
 
   draw(context: CanvasRenderingContext2D) {
@@ -84,11 +89,231 @@ export class MergeBall {
     context.save();
     context.translate(this.x, this.y);
 
-    if (this.theme === 'solar') {
-      this.drawSolarBody(context, currentRadius);
+    const imageSrc = this.tierData.image;
+    const img = imageSrc ? textureManager.getImage(imageSrc) : null;
+
+    if (img) {
+      this.drawSpriteBall(context, currentRadius, img);
     } else {
-      this.drawNeonOrb(context, currentRadius);
+      const themeDef = getThemeDefinition(this.theme);
+      switch (themeDef.renderStyle) {
+        case 'solar':
+          this.drawSolarBody(context, currentRadius);
+          break;
+        case 'neon':
+          this.drawNeonOrb(context, currentRadius);
+          break;
+        case 'gem':
+          this.drawGemStone(context, currentRadius);
+          break;
+        case 'glossy':
+        default:
+          this.drawGlossyBadge(context, currentRadius);
+          break;
+      }
     }
+
+    context.restore();
+  }
+
+  /**
+   * Rendu Sprite d'image PNG/WebP avec rotation physique, glow et flash
+   */
+  private drawSpriteBall(context: CanvasRenderingContext2D, r: number, img: HTMLImageElement) {
+    const td = this.tierData;
+
+    // Halo / Aura extérieure
+    context.save();
+    context.beginPath();
+    context.arc(0, 0, r * 1.25, 0, Math.PI * 2);
+    const aura = context.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 1.25);
+    aura.addColorStop(0, td.glowColor);
+    aura.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = aura;
+    context.globalAlpha = 0.55;
+    context.fill();
+    context.restore();
+
+    // Rendu du sprite avec rotation physique
+    context.save();
+    context.rotate(this.rotation);
+
+    context.shadowColor = this.flash > 0 ? '#ffffff' : td.glowColor;
+    context.shadowBlur = 12 + this.flash * 20;
+
+    const drawR = r * 0.98;
+    context.drawImage(img, -drawR, -drawR, drawR * 2, drawR * 2);
+
+    // Effet de flash blanc lors de la fusion
+    if (this.flash > 0) {
+      context.beginPath();
+      context.arc(0, 0, drawR, 0, Math.PI * 2);
+      context.fillStyle = `rgba(255, 255, 255, ${Math.min(0.85, this.flash)})`;
+      context.fill();
+    }
+    context.restore();
+  }
+
+  /**
+   * Rendu Stylisé Kawaii / Glossy Badge (Idéal Légumes, Animaux, Bonbons)
+   */
+  private drawGlossyBadge(context: CanvasRenderingContext2D, r: number) {
+    const td = this.tierData;
+
+    // Halo lumineux externe
+    context.save();
+    context.beginPath();
+    context.arc(0, 0, r * 1.35, 0, Math.PI * 2);
+    const aura = context.createRadialGradient(0, 0, r * 0.35, 0, 0, r * 1.35);
+    aura.addColorStop(0, td.glowColor);
+    aura.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = aura;
+    context.globalAlpha = 0.5;
+    context.fill();
+    context.restore();
+
+    // Sphère 3D stylisée
+    context.save();
+    context.beginPath();
+    context.arc(0, 0, r, 0, Math.PI * 2);
+    context.shadowColor = this.flash > 0 ? '#ffffff' : td.glowColor;
+    context.shadowBlur = 16 + this.flash * 20;
+
+    const grad = context.createRadialGradient(-r * 0.32, -r * 0.32, r * 0.05, 0, 0, r);
+    if (this.flash > 0) {
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.6, '#ffffff');
+      grad.addColorStop(1, td.color);
+    } else {
+      grad.addColorStop(0, td.secondaryColor || '#ffffff');
+      grad.addColorStop(0.4, td.color);
+      grad.addColorStop(1, '#090d16');
+    }
+    context.fillStyle = grad;
+    context.fill();
+
+    // Reflet brillant en croissant supérieur
+    if (this.flash <= 0) {
+      context.save();
+      context.beginPath();
+      context.ellipse(-r * 0.15, -r * 0.38, r * 0.52, r * 0.22, -0.25, 0, Math.PI * 2);
+      context.fillStyle = 'rgba(255, 255, 255, 0.42)';
+      context.fill();
+      context.restore();
+    }
+
+    // Bordure douce
+    context.lineWidth = Math.max(1.5, r * 0.05);
+    context.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    context.stroke();
+
+    // Emoji / Symbole au centre (avec rotation physique douce)
+    context.save();
+    context.rotate(this.rotation * 0.3);
+    const fontSize = Math.max(13, Math.round(r * 0.75));
+    context.font = `${fontSize}px 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    context.shadowBlur = 6;
+    context.fillText(td.symbol, 0, 2);
+    context.restore();
+
+    context.restore();
+  }
+
+  /**
+   * Rendu Gemme & Cristal facetté (Idéal Minerais & Trésors)
+   */
+  private drawGemStone(context: CanvasRenderingContext2D, r: number) {
+    const td = this.tierData;
+
+    // Halo étincelant
+    context.save();
+    context.beginPath();
+    context.arc(0, 0, r * 1.45, 0, Math.PI * 2);
+    const aura = context.createRadialGradient(0, 0, r * 0.3, 0, 0, r * 1.45);
+    aura.addColorStop(0, td.glowColor);
+    aura.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = aura;
+    context.globalAlpha = 0.6;
+    context.fill();
+    context.restore();
+
+    // Orbe cristalline
+    context.save();
+    context.beginPath();
+    context.arc(0, 0, r, 0, Math.PI * 2);
+    context.shadowColor = this.flash > 0 ? '#ffffff' : td.glowColor;
+    context.shadowBlur = 18 + this.flash * 20;
+
+    const grad = context.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.02, 0, 0, r);
+    if (this.flash > 0) {
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.5, '#ffffff');
+      grad.addColorStop(1, td.color);
+    } else {
+      grad.addColorStop(0, td.secondaryColor || '#ffffff');
+      grad.addColorStop(0.45, td.color);
+      grad.addColorStop(1, '#050a14');
+    }
+    context.fillStyle = grad;
+    context.fill();
+
+    // Facettes géométriques de cristal
+    if (this.flash <= 0) {
+      context.save();
+      context.clip();
+      context.rotate(this.rotation * 0.2);
+
+      context.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      context.lineWidth = Math.max(1, r * 0.04);
+
+      // Facette hexagonale intérieure
+      context.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const ang = (i * Math.PI) / 3;
+        const fx = Math.cos(ang) * (r * 0.62);
+        const fy = Math.sin(ang) * (r * 0.62);
+        if (i === 0) context.moveTo(fx, fy);
+        else context.lineTo(fx, fy);
+      }
+      context.closePath();
+      context.stroke();
+
+      // Rayons de facettes vers le bord
+      for (let i = 0; i < 6; i++) {
+        const ang = (i * Math.PI) / 3;
+        context.beginPath();
+        context.moveTo(Math.cos(ang) * (r * 0.62), Math.sin(ang) * (r * 0.62));
+        context.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+        context.stroke();
+      }
+
+      // Éclat spéculaire étoile
+      context.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      context.beginPath();
+      context.arc(-r * 0.3, -r * 0.3, Math.max(2, r * 0.12), 0, Math.PI * 2);
+      context.fill();
+
+      context.restore();
+    }
+
+    // Bordure cristalline
+    context.lineWidth = Math.max(1.5, r * 0.05);
+    context.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    context.stroke();
+
+    // Symbole / Emoji de gemme au centre
+    context.save();
+    const fontSize = Math.max(12, Math.round(r * 0.65));
+    context.font = `${fontSize}px 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.shadowColor = '#000000';
+    context.shadowBlur = 6;
+    context.fillText(td.symbol, 0, 1);
+    context.restore();
 
     context.restore();
   }

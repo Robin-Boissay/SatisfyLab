@@ -3,6 +3,28 @@
  * Synthèse en temps réel sans asset externe.
  */
 
+export type SoundMergeStyle = 'bubbly' | 'marimba' | 'arcade' | 'cartoon' | 'crystal';
+export type SoundCollisionStyle = 'wood' | 'glass' | 'bubble' | 'rubber' | 'arcade';
+
+export interface PlayMergeOptions {
+  style?: SoundMergeStyle;
+  volume?: number;
+  comboIndex?: number;
+  pitchMult?: number;
+}
+
+export interface PlayDropOptions {
+  style?: SoundMergeStyle;
+  volume?: number;
+  pitchMult?: number;
+}
+
+export interface PlayImpactOptions {
+  style?: SoundCollisionStyle;
+  volume?: number;
+  pitchMult?: number;
+}
+
 export class SoundEngine {
   private static instance: SoundEngine;
   private ctx: AudioContext | null = null;
@@ -10,6 +32,7 @@ export class SoundEngine {
   private streamDest: MediaStreamAudioDestinationNode | null = null;
   public isMuted: boolean = false;
   private baseFreq: number = 220; // Note La3 (A3)
+  private lastImpactTime: number = 0;
 
   private constructor() {}
 
@@ -184,61 +207,333 @@ export class SoundEngine {
   }
 
   /**
-   * Son de fusion pour Neon Merge Drop (Chime cristallin avec tier ascendant)
+   * Son de fusion pour Neon Merge Drop (styles variés, ASMR, montées harmoniques)
    */
-  public playMerge(tier: number) {
+  public playMerge(tier: number, options?: PlayMergeOptions) {
     if (!this.ctx || this.isMuted) return;
 
+    const style: SoundMergeStyle = options?.style || 'bubbly';
+    const volume = Math.max(0, Math.min(1.0, options?.volume !== undefined ? options.volume : 0.8));
+    if (volume <= 0.001) return;
+
+    const pitchMult = Math.max(0.5, Math.min(2.0, options?.pitchMult || 1.0));
+    const comboIndex = Math.max(0, options?.comboIndex || 0);
+    const comboMultiplier = Math.pow(1.08, Math.min(8, comboIndex)); // +1 demi-ton par palier de combo
+
     const now = this.ctx.currentTime;
-    // Notes douces et harmonieuses (Lydian / Pentatonic)
     const baseFreqs = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99, 1046.5];
-    const freq = baseFreqs[Math.min(tier, baseFreqs.length - 1)] || 523.25;
+    const rawFreq = baseFreqs[Math.min(tier, baseFreqs.length - 1)] || 523.25;
+    const targetFreq = rawFreq * pitchMult * comboMultiplier;
 
-    // Harmoniques cristallines
-    [freq, freq * 2].forEach((f, i) => {
-      const osc = this.ctx!.createOscillator();
-      const gain = this.ctx!.createGain();
+    if (style === 'bubbly') {
+      // 🫧 Pop / Bulle ASMR : pitch sweep ultra-rapide montant + click transitoire doux
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
 
-      osc.type = i === 0 ? 'sine' : 'triangle';
-      osc.frequency.setValueAtTime(f, now);
-      osc.frequency.exponentialRampToValueAtTime(f * 1.05, now + 0.15);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(targetFreq * 0.72, now);
+      osc.frequency.exponentialRampToValueAtTime(targetFreq * 1.55, now + 0.045);
+      osc.frequency.exponentialRampToValueAtTime(targetFreq * 1.4, now + 0.14);
 
-      const dur = 0.25;
-      const vol = i === 0 ? 0.6 : 0.25;
+      const dur = 0.15;
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(vol, now + 0.01);
+      gain.gain.linearRampToValueAtTime(volume * 0.85, now + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
 
       osc.connect(gain);
       gain.connect(this.masterGain!);
-
       osc.start(now);
       osc.stop(now + dur);
+
+      // Micro impulsion d'éclatement (clic feutré)
+      const click = this.ctx.createOscillator();
+      const clickGain = this.ctx.createGain();
+      click.type = 'triangle';
+      click.frequency.setValueAtTime(targetFreq * 3.2, now);
+      click.frequency.exponentialRampToValueAtTime(targetFreq * 0.9, now + 0.02);
+
+      clickGain.gain.setValueAtTime(volume * 0.4, now);
+      clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.02);
+
+      click.connect(clickGain);
+      clickGain.connect(this.masterGain!);
+      click.start(now);
+      click.stop(now + 0.02);
+    } else if (style === 'marimba') {
+      // 🪵 Marimba Zen / Suika Game : percussion bois chaleureuse
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(targetFreq, now);
+
+      const dur = 0.28;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.8, now + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+
+      // Harmonique de résonance du bois (4x freq courte)
+      const harm = this.ctx.createOscillator();
+      const harmGain = this.ctx.createGain();
+      harm.type = 'triangle';
+      harm.frequency.setValueAtTime(targetFreq * 3.95, now);
+
+      harmGain.gain.setValueAtTime(volume * 0.35, now);
+      harmGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+
+      harm.connect(harmGain);
+      harmGain.connect(this.masterGain!);
+      harm.start(now);
+      harm.stop(now + 0.05);
+    } else if (style === 'arcade') {
+      // 👾 Arcade 8-Bit : Chiptune double arpeggio
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(targetFreq, now);
+      osc.frequency.setValueAtTime(targetFreq * 1.26, now + 0.035); // tierce
+      osc.frequency.setValueAtTime(targetFreq * 1.5, now + 0.07); // quinte
+
+      const dur = 0.16;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.45, now + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+    } else if (style === 'cartoon') {
+      // 🎪 Cartoon Boing : ressort élastique oscillant
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(targetFreq * 0.8, now);
+      osc.frequency.exponentialRampToValueAtTime(targetFreq * 1.8, now + 0.05);
+      osc.frequency.exponentialRampToValueAtTime(targetFreq * 1.0, now + 0.22);
+
+      const dur = 0.24;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.75, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+    } else {
+      // ✨ Cristal / Carillon (défaut)
+      [targetFreq, targetFreq * 2].forEach((f, i) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+
+        osc.type = i === 0 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(f, now);
+        osc.frequency.exponentialRampToValueAtTime(f * 1.04, now + 0.15);
+
+        const dur = 0.28;
+        const vol = (i === 0 ? 0.6 : 0.25) * volume;
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(vol, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain!);
+        osc.start(now);
+        osc.stop(now + dur);
+      });
+    }
+  }
+
+  /**
+   * Son de déblocage triomphal d'un nouveau palier max dans Merge Drop
+   */
+  public playTierUnlock(tier: number, style?: SoundMergeStyle, pitchMult: number = 1.0) {
+    if (!this.ctx || this.isMuted) return;
+
+    const now = this.ctx.currentTime;
+    const baseFreqs = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99, 1046.5];
+    const root = (baseFreqs[Math.min(tier, baseFreqs.length - 1)] || 523.25) * pitchMult;
+
+    const waveType: OscillatorType = style === 'arcade' ? 'square' : (style === 'cartoon' ? 'sawtooth' : 'triangle');
+
+    // Arpège ascendant triomphal : tonique -> tierce -> quinte -> octave
+    [root, root * 1.25, root * 1.5, root * 2].forEach((f, idx) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      const startT = now + idx * 0.05;
+      const dur = 0.35;
+
+      osc.type = idx === 3 ? 'sine' : waveType;
+      osc.frequency.setValueAtTime(f, startT);
+
+      gain.gain.setValueAtTime(0.001, startT);
+      gain.gain.linearRampToValueAtTime(0.4, startT + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startT + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(startT);
+      osc.stop(startT + dur);
     });
   }
 
   /**
    * Petit son mécanique / clic feutré lors du lâcher d'une boule
    */
-  public playDrop() {
+  public playDrop(options?: PlayDropOptions) {
     if (!this.ctx || this.isMuted) return;
 
+    const volumeSetting = Math.max(0, Math.min(1.0, options?.volume !== undefined ? options.volume : 0.6));
+    if (volumeSetting <= 0.001) return;
+
+    const style: SoundMergeStyle = options?.style || 'bubbly';
+    const pitchMult = Math.max(0.5, Math.min(2.0, options?.pitchMult || 1.0));
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(320, now);
-    osc.frequency.exponentialRampToValueAtTime(120, now + 0.04);
+    if (style === 'arcade') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(440 * pitchMult, now);
+      osc.frequency.exponentialRampToValueAtTime(220 * pitchMult, now + 0.04);
+    } else if (style === 'cartoon') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(280 * pitchMult, now);
+      osc.frequency.exponentialRampToValueAtTime(560 * pitchMult, now + 0.05);
+    } else {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(340 * pitchMult, now);
+      osc.frequency.exponentialRampToValueAtTime(140 * pitchMult, now + 0.04);
+    }
 
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    const dur = 0.045;
+    gain.gain.setValueAtTime(volumeSetting * 0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
 
     osc.connect(gain);
     gain.connect(this.masterGain!);
-
     osc.start(now);
-    osc.stop(now + 0.04);
+    osc.stop(now + dur);
+  }
+
+  /**
+   * Son de collision physique (bille contre bille ou paroi)
+   */
+  public playImpact(relSpeed: number, options?: PlayImpactOptions) {
+    if (!this.ctx || this.isMuted) return;
+
+    const now = this.ctx.currentTime;
+    // Throttle pour éviter toute cacophonie (max 28 impacts par seconde)
+    if (now - this.lastImpactTime < 0.035) return;
+    this.lastImpactTime = now;
+
+    const volumeSetting = Math.max(0, Math.min(1.0, options?.volume !== undefined ? options.volume : 0.4));
+    if (volumeSetting <= 0.001) return;
+
+    // Normalisation de la vitesse relative pour doser l'intensité du choc
+    const normVel = Math.max(0.12, Math.min(1.0, relSpeed / 320));
+    const finalVol = volumeSetting * normVel;
+    const pitchMult = Math.max(0.5, Math.min(2.0, options?.pitchMult || 1.0));
+    const style: SoundCollisionStyle = options?.style || 'wood';
+
+    if (style === 'glass') {
+      // 🔮 Choc Verre / Bille cristalline
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      const baseF = (1200 + Math.random() * 250) * pitchMult;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(baseF, now);
+      osc.frequency.exponentialRampToValueAtTime(baseF * 0.95, now + 0.04);
+
+      const dur = 0.045;
+      gain.gain.setValueAtTime(finalVol * 0.45, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+    } else if (style === 'bubble') {
+      // 🫧 Micro Plop Doux
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      const startF = (220 + Math.random() * 50) * pitchMult;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(startF, now);
+      osc.frequency.exponentialRampToValueAtTime(startF * 1.6, now + 0.03);
+
+      const dur = 0.035;
+      gain.gain.setValueAtTime(finalVol * 0.55, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+    } else if (style === 'rubber') {
+      // ⚽ Rebond Caoutchouc / Thud feutré
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      const startF = (110 + Math.random() * 25) * pitchMult;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(startF, now);
+      osc.frequency.exponentialRampToValueAtTime(startF * 0.5, now + 0.05);
+
+      const dur = 0.055;
+      gain.gain.setValueAtTime(finalVol * 0.7, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+    } else if (style === 'arcade') {
+      // 👾 Clic 8-Bit chiptune
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime((720 + Math.random() * 90) * pitchMult, now);
+
+      const dur = 0.022;
+      gain.gain.setValueAtTime(finalVol * 0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+    } else {
+      // 🪵 Toc Bois / Noisette (défaut ASMR)
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      const startF = (190 + Math.random() * 40) * pitchMult;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(startF, now);
+      osc.frequency.exponentialRampToValueAtTime(startF * 0.45, now + 0.035);
+
+      const dur = 0.04;
+      gain.gain.setValueAtTime(finalVol * 0.65, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+    }
   }
 
   /**

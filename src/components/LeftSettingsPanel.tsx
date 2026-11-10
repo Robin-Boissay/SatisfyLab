@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Eye,
   Type,
+  Volume2,
   PanelLeftClose,
   PanelLeftOpen,
   Palette
@@ -72,6 +73,7 @@ export const LeftSettingsPanel: React.FC<LeftSettingsPanelProps> = ({
 
         <div className="flex flex-col items-center gap-2 text-slate-500">
           <Eye className="w-3.5 h-3.5" />
+          <Volume2 className="w-3.5 h-3.5" />
           <Type className="w-3.5 h-3.5" />
         </div>
       </aside>
@@ -151,17 +153,36 @@ export const LeftSettingsPanel: React.FC<LeftSettingsPanelProps> = ({
           </h2>
         </div>
 
-        {/* Contrôles dynamiques : Visuels & Textes */}
+        {/* Contrôles dynamiques : Visuels, Audio & Textes */}
         <DynamicControls
           schema={activeGame.configSchema}
           values={config}
           defaultValues={activeGame.defaultConfig}
           onChange={onConfigChange}
           onReset={onResetConfig}
-          allowedCategories={['visuals', 'texts']}
+          allowedCategories={['visuals', 'audio', 'texts']}
           defaultTab="all"
           showReset={false}
         />
+
+        {activeGameId === 'merge-drop' && (
+          <div className="pt-2">
+            <a
+              href="/theme-studio.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-cyan-500/20 via-sky-500/15 to-fuchsia-500/20 border border-cyan-500/40 text-cyan-200 hover:text-white hover:border-cyan-300 text-xs font-bold transition-all shadow-md group"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm group-hover:scale-110 transition-transform">✂️</span>
+                <span>{language === 'fr' ? 'Studio de Découpe IA' : 'AI Theme Studio'}</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-md bg-cyan-500/30 text-cyan-200 font-mono">
+                10 Paliers
+              </span>
+            </a>
+          </div>
+        )}
       </div>
     </aside>
   );

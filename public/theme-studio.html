@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Merge Drop - Studio de Découpage de Thèmes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #090d16;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #00f0ff, #ff007f);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .main-container {
+      display: grid;
+      grid-template-columns: 340px 1fr 340px;
+      gap: 1.5rem;
+      padding: 1.5rem;
+      flex: 1;
+    }
+    @media (max-width: 1200px) {
+      .main-container { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .panel-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 0.6rem;
+    }
+    .dropzone {
+      border: 2px dashed #00f0ff;
+      border-radius: 12px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(0, 240, 255, 0.03);
+      transition: all 0.2s;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      background: rgba(0, 240, 255, 0.1);
+      border-color: #ff007f;
+    }
+    .dropzone p { font-size: 0.85rem; color: #94a3b8; margin-top: 0.5rem; }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .control-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+    }
+    .control-group label span {
+      color: #00f0ff;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #00f0ff;
+      cursor: pointer;
+    }
+    input[type="text"], select {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      color: #fff;
+      font-size: 0.85rem;
+      font-family: inherit;
+    }
+    .preview-canvas-container {
+      background: #020617;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      min-height: 400px;
+    }
+    canvas#sourceCanvas {
+      max-width: 100%;
+      max-height: 65vh;
+      object-fit: contain;
+      cursor: crosshair;
+    }
+    .btn {
+      background: linear-gradient(135deg, #00f0ff, #0284c7);
+      color: #000;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+    .btn:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(0, 240, 255, 0.35);
+    }
+    .btn-secondary {
+      background: #334155;
+      color: #fff;
+    }
+    .btn-secondary:hover {
+      background: #475569;
+      box-shadow: none;
+    }
+    .tiers-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      max-height: 480px;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+    }
+    .tier-card {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .tier-card canvas {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23334155"><rect width="8" height="8"/><rect x="8" y="8" width="8" height="8"/></svg>') #0f172a;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+    .tier-card span {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #94a3b8;
+    }
+    .code-box {
+      background: #020617;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 0.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: #38bdf8;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>✂️ Merge Drop - Découpeur de Thèmes</h1>
+    <a href="/" class="btn btn-secondary">← Retour au Jeu</a>
+  </header>
+
+  <div class="main-container">
+    <!-- PANEL DE GAUCHE : IMPORT & CONTRÔLES -->
+    <div class="panel">
+      <div class="panel-title">1. Image & Découpe</div>
+
+      <div class="dropzone" id="dropzone">
+        <svg width="36" height="36" fill="none" stroke="#00f0ff" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+        <p><strong>Glissez votre image IA ici</strong><br>ou collez avec Ctrl+V / Cliquez</p>
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+      </div>
+
+      <div class="control-group">
+        <label>Dossier du Thème</label>
+        <input type="text" id="themeIdInput" value="mon_theme" placeholder="ex: sweets, monsters, cars">
+      </div>
+
+      <div class="control-group">
+        <label>Format de Grille</label>
+        <select id="gridPresetSelect">
+          <option value="5x2" selected>5 colonnes × 2 lignes (Standard)</option>
+          <option value="2x5">2 colonnes × 5 lignes</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Taille des Cercles <span id="radiusVal">85%</span></label>
+        <input type="range" id="radiusSlider" min="40" max="100" value="85">
+      </div>
+
+      <div class="control-group">
+        <label>Marge Horizontale <span id="marginXVal">0px</span></label>
+        <input type="range" id="marginXSlider" min="-100" max="100" value="0">
+      </div>
+
+      <div class="control-group">
+        <label>Marge Verticale <span id="marginYVal">0px</span></label>
+        <input type="range" id="marginYSlider" min="-100" max="100" value="0">
+      </div>
+
+      <div class="control-group">
+        <label>Espacement X <span id="spacingXVal">0px</span></label>
+        <input type="range" id="spacingXSlider" min="-50" max="50" value="0">
+      </div>
+
+      <div class="control-group">
+        <label>Espacement Y <span id="spacingYVal">0px</span></label>
+        <input type="range" id="spacingYSlider" min="-50" max="50" value="0">
+      </div>
+
+      <div class="control-group">
+        <label>Suppression Fond Noir</label>
+        <select id="removeBgSelect">
+          <option value="circle-mask" selected>Masque Circulaire Strict (Recommandé)</option>
+          <option value="chroma-black">Détourage Noir (Chroma-Key)</option>
+          <option value="none">Aucun (Garder fond d'origine)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- CENTRE : VISUALISATION EN DIRECT DE LA GRILLE -->
+    <div class="panel" style="padding: 1rem;">
+      <div class="panel-title" style="justify-content: space-between;">
+        <span>2. Aperçu du Positionnement (10 Paliers)</span>
+        <span style="font-size: 0.75rem; color: #94a3b8; font-weight: normal;">Déplacez les curseurs si besoin pour aligner les 10 cercles</span>
+      </div>
+      <div class="preview-canvas-container">
+        <canvas id="sourceCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- DROITE : LES 10 IMAGES DÉCOUPÉES 256x256 & EXPORT -->
+    <div class="panel">
+      <div class="panel-title">3. Exportation (256×256 px)</div>
+
+      <button id="downloadZipBtn" class="btn">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+        </svg>
+        Télécharger le ZIP (10 images)
+      </button>
+
+      <button id="downloadAllBtn" class="btn btn-secondary">
+        Télécharger les 10 fichiers PNG
+      </button>
+
+      <div class="panel-title" style="margin-top: 0.5rem;">Paliers Découpés</div>
+      <div class="tiers-grid" id="tiersGrid"></div>
+
+      <div class="panel-title" style="margin-top: 0.5rem;">Code pour themeRegistry.ts</div>
+      <div class="code-box" id="codeBox">// Déposez une image pour voir le code généré</div>
+      <button id="copyCodeBtn" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.4rem;">
+        📋 Copier le code TypeScript
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let sourceImage = null;
+    const sourceCanvas = document.getElementById('sourceCanvas');
+    const sourceCtx = sourceCanvas.getContext('2d');
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const tiersGrid = document.getElementById('tiersGrid');
+    const codeBox = document.getElementById('codeBox');
+
+    // Contrôles
+    const themeIdInput = document.getElementById('themeIdInput');
+    const gridPresetSelect = document.getElementById('gridPresetSelect');
+    const radiusSlider = document.getElementById('radiusSlider');
+    const marginXSlider = document.getElementById('marginXSlider');
+    const marginYSlider = document.getElementById('marginYSlider');
+    const spacingXSlider = document.getElementById('spacingXSlider');
+    const spacingYSlider = document.getElementById('spacingYSlider');
+    const removeBgSelect = document.getElementById('removeBgSelect');
+
+    const radiusVal = document.getElementById('radiusVal');
+    const marginXVal = document.getElementById('marginXVal');
+    const marginYVal = document.getElementById('marginYVal');
+    const spacingXVal = document.getElementById('spacingXVal');
+    const spacingYVal = document.getElementById('spacingYVal');
+
+    // 10 Canvas pour les 10 tiers (256x256 chacun)
+    const tierCanvases = Array.from({ length: 10 }, (_, i) => {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      return c;
+    });
+
+    // Initialiser les miniatures
+    function initTierGrid() {
+      tiersGrid.innerHTML = '';
+      tierCanvases.forEach((c, idx) => {
+        const card = document.createElement('div');
+        card.className = 'tier-card';
+        card.appendChild(c);
+        const label = document.createElement('span');
+        label.innerText = `tier_${idx}.png (Palier ${idx + 1})`;
+        card.appendChild(label);
+        tiersGrid.appendChild(card);
+      });
+    }
+    initTierGrid();
+
+    // Glisser-déposer & Fichiers
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) loadImage(e.target.files[0]);
+    });
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
+    });
+
+    // Coller depuis le presse-papier
+    window.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+      for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const file = item.getAsFile();
+          loadImage(file);
+          break;
+        }
+      }
+    });
+
+    function loadImage(file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          sourceImage = img;
+          sourceCanvas.width = img.naturalWidth;
+          sourceCanvas.height = img.naturalHeight;
+          render();
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Mise à jour des valeurs des curseurs
+    function updateLabels() {
+      radiusVal.innerText = `${radiusSlider.value}%`;
+      marginXVal.innerText = `${marginXSlider.value}px`;
+      marginYVal.innerText = `${marginYSlider.value}px`;
+      spacingXVal.innerText = `${spacingXSlider.value}px`;
+      spacingYVal.innerText = `${spacingYSlider.value}px`;
+    }
+
+    [radiusSlider, marginXSlider, marginYSlider, spacingXSlider, spacingYSlider, gridPresetSelect, removeBgSelect, themeIdInput].forEach(ctrl => {
+      ctrl.addEventListener('input', () => {
+        updateLabels();
+        render();
+      });
+    });
+
+    function render() {
+      if (!sourceImage) return;
+
+      const w = sourceCanvas.width;
+      const h = sourceCanvas.height;
+
+      // 1. Dessiner l'image originale sur le grand canvas
+      sourceCtx.clearRect(0, 0, w, h);
+      sourceCtx.drawImage(sourceImage, 0, 0);
+
+      // Calcul des 10 positions
+      const is5x2 = gridPresetSelect.value === '5x2';
+      const cols = is5x2 ? 5 : 2;
+      const rows = is5x2 ? 2 : 5;
+
+      const cellW = w / cols;
+      const cellH = h / rows;
+
+      const userRadiusPercent = parseInt(radiusSlider.value, 10) / 100;
+      const baseR = (Math.min(cellW, cellH) * 0.5) * userRadiusPercent;
+
+      const offsetX = parseInt(marginXSlider.value, 10);
+      const offsetY = parseInt(marginYSlider.value, 10);
+      const spaceX = parseInt(spacingXSlider.value, 10);
+      const spaceY = parseInt(spacingYSlider.value, 10);
+
+      const removeBgMode = removeBgSelect.value;
+
+      for (let i = 0; i < 10; i++) {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+
+        const cx = (col + 0.5) * cellW + offsetX + (col - (cols - 1) / 2) * spaceX;
+        const cy = (row + 0.5) * cellH + offsetY + (row - (rows - 1) / 2) * spaceY;
+
+        // 2. Découper vers le canvas 256x256 dédié
+        const tCanvas = tierCanvases[i];
+        const tCtx = tCanvas.getContext('2d');
+        tCtx.clearRect(0, 0, 256, 256);
+
+        tCtx.save();
+        if (removeBgMode === 'circle-mask') {
+          // Masque circulaire parfait anti-aliasé
+          tCtx.beginPath();
+          tCtx.arc(128, 128, 124, 0, Math.PI * 2);
+          tCtx.clip();
+        }
+
+        // Dessiner la portion extraite
+        tCtx.drawImage(
+          sourceImage,
+          cx - baseR, cy - baseR, baseR * 2, baseR * 2,
+          4, 4, 248, 248
+        );
+        tCtx.restore();
+
+        // Si chroma keying demandé
+        if (removeBgMode === 'chroma-black') {
+          const imgData = tCtx.getImageData(0, 0, 256, 256);
+          const d = imgData.data;
+          for (let p = 0; p < d.length; p += 4) {
+            const distFromCenter = Math.hypot((p/4 % 256) - 128, Math.floor(p/4 / 256) - 128);
+            if (distFromCenter > 124) {
+              d[p + 3] = 0; // cercle strict à l'extérieur
+            } else {
+              const lum = (d[p] + d[p+1] + d[p+2]) / 3;
+              if (lum < 25) {
+                d[p + 3] = Math.max(0, (lum - 10) * 17);
+              }
+            }
+          }
+          tCtx.putImageData(imgData, 0, 0);
+        }
+
+        // 3. Dessiner la grille de guidage sur le canvas principal
+        sourceCtx.save();
+        sourceCtx.beginPath();
+        sourceCtx.arc(cx, cy, baseR, 0, Math.PI * 2);
+        sourceCtx.strokeStyle = '#00f0ff';
+        sourceCtx.lineWidth = Math.max(3, w * 0.003);
+        sourceCtx.shadowColor = '#00f0ff';
+        sourceCtx.shadowBlur = 10;
+        sourceCtx.stroke();
+
+        // Numéro du Tier
+        sourceCtx.fillStyle = '#ff007f';
+        sourceCtx.font = `bold ${Math.max(16, Math.round(baseR * 0.35))}px "JetBrains Mono", sans-serif`;
+        sourceCtx.textAlign = 'center';
+        sourceCtx.textBaseline = 'middle';
+        sourceCtx.shadowColor = '#000000';
+        sourceCtx.shadowBlur = 6;
+        sourceCtx.fillText(`${i}`, cx, cy - baseR * 0.65);
+        sourceCtx.restore();
+      }
+
+      updateCodeSnippet();
+    }
+
+    function updateCodeSnippet() {
+      const id = themeIdInput.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'custom_theme';
+      const radii = [16, 22, 28, 36, 44, 52, 62, 72, 82, 94];
+      const snippet = `// À coller dans src/games/merge-drop/themeRegistry.ts dans MERGE_THEMES :
+${id}: {
+  id: '${id}',
+  label: '✨ ${id.toUpperCase()}',
+  labelEn: '✨ ${id.toUpperCase()}',
+  description: 'Thème généré avec 10 paliers personnalisés.',
+  descriptionEn: 'Custom generated theme with 10 tiers.',
+  renderStyle: 'glossy',
+  defaultTitle: '✨ ${id.toUpperCase()}',
+  defaultTitleEn: '✨ ${id.toUpperCase()}',
+  metricMaxLabel: 'PALIER MAX',
+  metricMaxLabelEn: 'MAX TIER',
+  victoryText: '👑 PALIER ULTIME ATTEINT ! 👑',
+  victoryTextEn: '👑 ULTIMATE TIER REACHED! 👑',
+  streamStartLabel: 'LANCER RAFALE NIVEAU 1',
+  streamStartLabelEn: 'LAUNCH TIER 1 STREAM',
+  streamStopLabel: 'ARRÊTER RAFALE NIVEAU 1',
+  streamStopLabelEn: 'STOP TIER 1 STREAM',
+  tiers: [
+    ${Array.from({ length: 10 }, (_, i) => `{ tier: ${i}, name: 'Palier ${i + 1}', nameEn: 'Tier ${i + 1}', symbol: '${i + 1}', radius: ${radii[i]}, baseRadius: ${radii[i]}, color: '#00f0ff', glowColor: 'rgba(0, 240, 255, 0.8)', points: ${Math.pow(2, i + 1)}, image: '/themes/${id}/tier_${i}.png' }`).join(',\n    ')}
+  ]
+}`;
+      codeBox.innerText = snippet;
+    }
+
+    // Télécharger en ZIP
+    document.getElementById('downloadZipBtn').addEventListener('click', async () => {
+      if (!sourceImage) {
+        alert("Veuillez d'abord glisser ou sélectionner une image !");
+        return;
+      }
+      const zip = new JSZip();
+      const themeId = themeIdInput.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'custom_theme';
+      const folder = zip.folder(themeId);
+
+      for (let i = 0; i < 10; i++) {
+        const dataUrl = tierCanvases[i].toDataURL('image/png');
+        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+        folder.file(`tier_${i}.png`, base64Data, { base64: true });
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(content);
+      a.download = `${themeId}_tiers.zip`;
+      a.click();
+    });
+
+    // Télécharger les 10 fichiers individuellement
+    document.getElementById('downloadAllBtn').addEventListener('click', () => {
+      if (!sourceImage) {
+        alert("Veuillez d'abord glisser ou sélectionner une image !");
+        return;
+      }
+      const themeId = themeIdInput.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'custom_theme';
+      tierCanvases.forEach((c, i) => {
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = c.toDataURL('image/png');
+          a.download = `tier_${i}.png`;
+          a.click();
+        }, i * 150);
+      });
+    });
+
+    document.getElementById('copyCodeBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(codeBox.innerText);
+      alert('Code TypeScript copié dans le presse-papier !');
+    });
+
+    // Démo de démarrage avec un canvas vierge
+    sourceCanvas.width = 1200;
+    sourceCanvas.height = 480;
+    sourceCtx.fillStyle = '#060a12';
+    sourceCtx.fillRect(0, 0, 1200, 480);
+    sourceCtx.fillStyle = '#64748b';
+    sourceCtx.font = '600 20px "Inter", sans-serif';
+    sourceCtx.textAlign = 'center';
+    sourceCtx.fillText('Glissez votre image IA 5x2 ou 2x5 pour découper les 10 icones', 600, 240);
+  </script>
+</body>
+</html>
+

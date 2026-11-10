@@ -1,5 +1,5 @@
 import { ConfigSchema } from '../../core/types';
-import { DEFAULT_MERGE_DROP_CONFIG } from './types';
+import { DEFAULT_MERGE_DROP_CONFIG, THEME_OPTIONS } from './types';
 
 export const mergeDropConfigSchema: ConfigSchema = {
   // --- PERSONNALISATION & VISUELS ---
@@ -8,12 +8,9 @@ export const mergeDropConfigSchema: ConfigSchema = {
     label: 'Thème des Skins',
     type: 'select',
     category: 'visuals',
-    options: [
-      { label: '🪐 Système Solaire', value: 'solar' },
-      { label: '⚡ Néon Cyberpunk', value: 'neon' }
-    ],
+    options: THEME_OPTIONS,
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.SKIN_THEME,
-    description: 'Change l’apparence des astres / orbes et leurs noms.'
+    description: 'Change l’apparence des astres / orbes / skins. Studio IA : /theme-studio.html'
   },
   CONTAINER_SHAPE: {
     id: 'CONTAINER_SHAPE',
@@ -76,6 +73,110 @@ export const mergeDropConfigSchema: ConfigSchema = {
     ],
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.BACKGROUND_EFFECT,
     description: 'Effets d’arrière-plan animés captivants pour formats courts TikTok / Reels.'
+  },
+  SHOW_EVOLUTION_BAR: {
+    id: 'SHOW_EVOLUTION_BAR',
+    label: 'Frise d’Évolution (10 Paliers)',
+    type: 'boolean',
+    category: 'visuals',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SHOW_EVOLUTION_BAR,
+    description: 'Affiche les 10 cercles qui se débloquent avec le palier max (idéal rétention vidéo).'
+  },
+  SHOW_TOP_HUD: {
+    id: 'SHOW_TOP_HUD',
+    label: 'Afficher le HUD du haut (Titre & Score)',
+    type: 'boolean',
+    category: 'visuals',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SHOW_TOP_HUD,
+    description: 'Active ou masque les textes du haut (titre, score, niveau max).'
+  },
+  HUD_TOP_OFFSET: {
+    id: 'HUD_TOP_OFFSET',
+    label: 'Décalage haut du HUD (Zone Safe TikTok)',
+    type: 'range',
+    category: 'visuals',
+    visibleIf: (values) => values.SHOW_TOP_HUD !== false,
+    min: 0,
+    max: 70,
+    step: 5,
+    unit: 'px',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.HUD_TOP_OFFSET,
+    description: 'Descend le titre et le score sous les onglets et la recherche de TikTok.'
+  },
+  CONTAINER_STROKE_WIDTH: {
+    id: 'CONTAINER_STROKE_WIDTH',
+    label: 'Épaisseur des parois du conteneur',
+    type: 'range',
+    category: 'visuals',
+    min: 1.5,
+    max: 10,
+    step: 0.5,
+    unit: 'px',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.CONTAINER_STROKE_WIDTH,
+    description: 'Rend les contours néon du bocal plus épais et visibles sur mobile.'
+  },
+  CONTAINER_TOP_Y: {
+    id: 'CONTAINER_TOP_Y',
+    label: 'Hauteur Haut du conteneur (Y min)',
+    type: 'range',
+    category: 'visuals',
+    min: 100,
+    max: 300,
+    step: 5,
+    unit: 'px',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.CONTAINER_TOP_Y,
+    description: 'Ajuste la position du haut du conteneur et de l’entonnoir de largage.'
+  },
+  CONTAINER_BOTTOM_Y: {
+    id: 'CONTAINER_BOTTOM_Y',
+    label: 'Hauteur Bas du conteneur (Y max)',
+    type: 'range',
+    category: 'visuals',
+    min: 550,
+    max: 920,
+    step: 5,
+    unit: 'px',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.CONTAINER_BOTTOM_Y,
+    description: 'Remonte le fond du conteneur pour laisser la place à la barre des 10 icônes ou aux overlays TikTok.'
+  },
+  EVOLUTION_BAR_LAYOUT: {
+    id: 'EVOLUTION_BAR_LAYOUT',
+    label: 'Disposition de la Frise',
+    type: 'select',
+    category: 'visuals',
+    visibleIf: (values) => values.SHOW_EVOLUTION_BAR !== false,
+    options: [
+      { label: '1 Ligne (10 cercles alignés)', value: '1row' },
+      { label: '2 Lignes (5×2 Cercles Géants)', value: '2rows' }
+    ],
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.EVOLUTION_BAR_LAYOUT,
+    description: 'Choisissez entre 1 ligne ou 2 lignes de 5 cercles plus grands et lisibles.'
+  },
+  EVOLUTION_BAR_SIZE: {
+    id: 'EVOLUTION_BAR_SIZE',
+    label: 'Taille des cercles de progression',
+    type: 'range',
+    category: 'visuals',
+    visibleIf: (values) => values.SHOW_EVOLUTION_BAR !== false,
+    min: 14,
+    max: 26,
+    step: 1,
+    unit: 'px',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.EVOLUTION_BAR_SIZE,
+    description: 'Agrandit les icônes de la frise pour les voir nettement sur smartphone.'
+  },
+  EVOLUTION_BAR_Y: {
+    id: 'EVOLUTION_BAR_Y',
+    label: 'Hauteur verticale de la Frise',
+    type: 'range',
+    category: 'visuals',
+    visibleIf: (values) => values.SHOW_EVOLUTION_BAR !== false,
+    min: 90,
+    max: 920,
+    step: 10,
+    unit: 'px',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.EVOLUTION_BAR_Y,
+    description: 'Placez la frise en haut (120 px) ou au-dessus des hashtags TikTok (780 px).'
   },
 
   // --- GÉNÉRATEUR DE FORME PERSONNALISÉE ---
@@ -309,6 +410,107 @@ export const mergeDropConfigSchema: ConfigSchema = {
     type: 'boolean',
     category: 'visuals',
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.SCREEN_SHAKE_ENABLED
+  },
+
+  // --- SONS & AUDIO ASMR ---
+  SOUND_MERGE_ENABLED: {
+    id: 'SOUND_MERGE_ENABLED',
+    label: 'Activer le Son des Fusions',
+    type: 'boolean',
+    category: 'audio',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_MERGE_ENABLED,
+    description: 'Joue un effet sonore jubilatoire lorsque 2 billes identiques fusionnent.'
+  },
+  SOUND_MERGE_STYLE: {
+    id: 'SOUND_MERGE_STYLE',
+    label: 'Style Sonore des Fusions',
+    type: 'select',
+    category: 'audio',
+    visibleIf: (values) => values.SOUND_MERGE_ENABLED !== false,
+    options: [
+      { label: '🫧 Pop / Bulles ASMR (Viral TikTok)', value: 'bubbly' },
+      { label: '🪵 Bois / Marimba Zen (Suika)', value: 'marimba' },
+      { label: '👾 Rétro Arcade 8-Bit (Chiptune)', value: 'arcade' },
+      { label: '🎪 Cartoon / Boing Élastique', value: 'cartoon' },
+      { label: '✨ Carillon Cristallin & Céleste', value: 'crystal' }
+    ],
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_MERGE_STYLE,
+    description: 'Personnalise la texture acoustique lors des fusions.'
+  },
+  SOUND_MERGE_VOLUME: {
+    id: 'SOUND_MERGE_VOLUME',
+    label: 'Volume des Fusions',
+    type: 'range',
+    category: 'audio',
+    visibleIf: (values) => values.SOUND_MERGE_ENABLED !== false,
+    min: 0.1,
+    max: 1.0,
+    step: 0.05,
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_MERGE_VOLUME,
+    description: 'Dose l’intensité du son de fusion.'
+  },
+  SOUND_COLLISION_ENABLED: {
+    id: 'SOUND_COLLISION_ENABLED',
+    label: 'Bruits de Chocs & Parois (ASMR)',
+    type: 'boolean',
+    category: 'audio',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_COLLISION_ENABLED,
+    description: 'Joue de discrets cliquetis physiques quand les billes se heurtent ou touchent les parois.'
+  },
+  SOUND_COLLISION_STYLE: {
+    id: 'SOUND_COLLISION_STYLE',
+    label: 'Style Sonore des Collisions',
+    type: 'select',
+    category: 'audio',
+    visibleIf: (values) => values.SOUND_COLLISION_ENABLED !== false,
+    options: [
+      { label: '🪵 Toc Bois / Noisette (Doux & Sec)', value: 'wood' },
+      { label: '🔮 Choc Verre / Bille Cristalline', value: 'glass' },
+      { label: '🫧 Micro Plop Liquide', value: 'bubble' },
+      { label: '⚽ Rebond Caoutchouc / Thud Feutré', value: 'rubber' },
+      { label: '👾 Petit Clic 8-Bit', value: 'arcade' }
+    ],
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_COLLISION_STYLE,
+    description: 'Type de matière simulée pour les chocs et rebonds.'
+  },
+  SOUND_COLLISION_VOLUME: {
+    id: 'SOUND_COLLISION_VOLUME',
+    label: 'Volume des Collisions',
+    type: 'range',
+    category: 'audio',
+    visibleIf: (values) => values.SOUND_COLLISION_ENABLED !== false,
+    min: 0.05,
+    max: 1.0,
+    step: 0.05,
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_COLLISION_VOLUME,
+    description: 'Ajuste le niveau sonore des petits chocs physiques.'
+  },
+  SOUND_DROP_ENABLED: {
+    id: 'SOUND_DROP_ENABLED',
+    label: 'Son au Lâcher de Bille',
+    type: 'boolean',
+    category: 'audio',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_DROP_ENABLED,
+    description: 'Petit clic ou bruitage feutré à l’apparition de chaque bille.'
+  },
+  SOUND_COMBO_PITCH: {
+    id: 'SOUND_COMBO_PITCH',
+    label: 'Montée en Gamme des Combos',
+    type: 'boolean',
+    category: 'audio',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_COMBO_PITCH,
+    description: 'Augmente la tonalité à chaque fusion en chaîne (effet récompense addictive).'
+  },
+  SOUND_PITCH: {
+    id: 'SOUND_PITCH',
+    label: 'Tonalité Globale (Pitch)',
+    type: 'range',
+    category: 'audio',
+    min: 0.7,
+    max: 1.4,
+    step: 0.05,
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_PITCH,
+    description: 'Rend l’ensemble des sons plus grave (lourd) ou plus aigu (kawaii).'
   },
 
   // --- TEXTES AFFICHÉS ---

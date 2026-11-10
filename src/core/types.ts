@@ -72,6 +72,7 @@ export interface GameHUDState {
   statusText?: string;
   extraActionLabel?: string;
   extraActionActive?: boolean;
+  topOffset?: number;
 }
 
 export interface GameInstance {
