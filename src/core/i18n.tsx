@@ -54,12 +54,22 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     'viewport.rec_badge': 'REC 9:16',
     'viewport.click_to_play': 'Clique ou Appuie pour Jouer',
 
-    // Recorder notifications
+    // Recorder notifications & Export Modal
     'recorder.not_supported': '⚠️ Capture vidéo non supportée par votre navigateur',
     'recorder.canvas_not_found': '⚠️ Canvas introuvable pour la capture',
     'recorder.started': '● Enregistrement 9:16 démarré (Touche V pour stopper)',
-    'recorder.exported': '✓ Vidéo 9:16 exportée avec succès !',
+    'recorder.exported': '✓ Vidéo WebM exportée avec succès !',
+    'recorder.exported_mp4': '✓ Vidéo MP4 convertie et téléchargée avec succès !',
     'recorder.failed': "⚠️ Échec de lancement de l'enregistrement",
+    'recorder.modal_title': 'Vidéo 9:16 Enregistrée',
+    'recorder.modal_desc': 'Choisissez votre format d\'exportation :',
+    'recorder.btn_mp4': 'Convertir & Télécharger en MP4',
+    'recorder.btn_mp4_subtitle': 'Idéal TikTok, Instagram Reels, CapCut, Premiere',
+    'recorder.btn_webm': 'Télécharger en WebM (Natif)',
+    'recorder.btn_webm_subtitle': 'Téléchargement instantané sans réencodage',
+    'recorder.converting_mp4': 'Conversion MP4 en cours... ⚡',
+    'recorder.conversion_failed': '⚠️ Serveur de conversion indisponible, téléchargement WebM effectué.',
+    'recorder.modal_close': 'Fermer',
 
     // Settings Panel
     'settings.back_to_hub': 'RETOUR AU HUB',
@@ -108,12 +118,22 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     'viewport.rec_badge': 'REC 9:16',
     'viewport.click_to_play': 'Click or Tap to Play',
 
-    // Recorder notifications
+    // Recorder notifications & Export Modal
     'recorder.not_supported': '⚠️ Video capture not supported by your browser',
     'recorder.canvas_not_found': '⚠️ Canvas not found for capture',
     'recorder.started': '● 9:16 recording started (Press V to stop)',
-    'recorder.exported': '✓ 9:16 video exported successfully!',
+    'recorder.exported': '✓ WebM video exported successfully!',
+    'recorder.exported_mp4': '✓ MP4 video converted and downloaded successfully!',
     'recorder.failed': '⚠️ Failed to start recording',
+    'recorder.modal_title': '9:16 Video Recorded',
+    'recorder.modal_desc': 'Choose your export format:',
+    'recorder.btn_mp4': 'Convert & Download as MP4',
+    'recorder.btn_mp4_subtitle': 'Best for TikTok, Instagram Reels, CapCut, Premiere',
+    'recorder.btn_webm': 'Download as WebM (Native)',
+    'recorder.btn_webm_subtitle': 'Instant download without re-encoding',
+    'recorder.converting_mp4': 'Converting to MP4... ⚡',
+    'recorder.conversion_failed': '⚠️ Conversion server unavailable, downloading WebM instead.',
+    'recorder.modal_close': 'Close',
 
     // Settings Panel
     'settings.back_to_hub': 'BACK TO HUB',
@@ -300,8 +320,64 @@ export const FIELD_METADATA_TRANSLATIONS: Record<string, Record<Language, { labe
     en: { label: 'Stream Rate (ms)', description: 'Delay between automatic ball drops.' }
   },
   CONTAINER_SHAPE: {
-    fr: { label: 'Forme du récipient', description: 'Jarre en verre évasée ou Tube droit.' },
-    en: { label: 'Container Shape', description: 'Flared Glass Jar or Straight Tube.' }
+    fr: { label: 'Forme du récipient', description: 'Jarre galbée, fiole ronde avec tube, sur-mesure ou tube rectangulaire.' },
+    en: { label: 'Container Shape', description: 'Curved Jar, Round Flask & Tube, Custom Shape or Straight Tube.' }
+  },
+  CONTAINER_COLOR: {
+    fr: { label: 'Couleur de la forme', description: 'Personnalise la couleur du contour lumineux du récipient.' },
+    en: { label: 'Container Color', description: 'Customize the neon outline color of the container.' }
+  },
+  BACKGROUND_COLOR: {
+    fr: { label: 'Couleur de fond', description: 'Teinte de base de l’arrière-plan sombre.' },
+    en: { label: 'Background Color', description: 'Base tint for the dark canvas background.' }
+  },
+  BACKGROUND_EFFECT: {
+    fr: { label: 'Animation de fond (TikTok)', description: 'Effet visuel captivant : étoiles, rayons célestes, grille 3D, vagues aurora ou tunnel.' },
+    en: { label: 'Background Animation (TikTok)', description: 'Captivating background visual: stars, rays, 3D grid, aurora waves, or tunnel.' }
+  },
+  CUSTOM_PRESET: {
+    fr: { label: 'Préréglage de forme', description: 'Gabarit de départ : Erlenmeyer, Sablier, Amphore, Diamant, Entonnoir, Ondulé.' },
+    en: { label: 'Shape Preset', description: 'Starting template: Erlenmeyer, Hourglass, Vase, Diamond, Funnel, Wavy.' }
+  },
+  CUSTOM_NECK_WIDTH: {
+    fr: { label: 'Largeur du col / haut', description: 'Demi-largeur de l’ouverture supérieure par laquelle les billes tombent.' },
+    en: { label: 'Neck / Top Width', description: 'Half-width of the top opening through which balls drop.' }
+  },
+  CUSTOM_BELLY_WIDTH: {
+    fr: { label: 'Largeur de la panse / milieu', description: 'Demi-largeur au point de renflement ou d’étranglement.' },
+    en: { label: 'Belly / Middle Width', description: 'Half-width at the widest or narrowest point.' }
+  },
+  CUSTOM_BELLY_POSITION: {
+    fr: { label: 'Hauteur de la panse', description: 'Emplacement vertical du renflement (haut, milieu ou bas).' },
+    en: { label: 'Belly Position', description: 'Vertical placement of the belly curve (top, middle, or bottom).' }
+  },
+  CUSTOM_BOTTOM_WIDTH: {
+    fr: { label: 'Largeur du fond', description: 'Demi-largeur de la base plate du réceptacle.' },
+    en: { label: 'Bottom Width', description: 'Half-width of the flat bottom base.' }
+  },
+  CUSTOM_CURVATURE: {
+    fr: { label: 'Arrondi & Galbe', description: '0 = Lignes droites angulaires (style polygone/fiole), 1 = Galbe organique doux.' },
+    en: { label: 'Curvature & Smoothness', description: '0 = Straight angular lines (polygon/beaker style), 1 = Smooth organic curve.' }
+  },
+  CUSTOM_WAVE_COUNT: {
+    fr: { label: 'Ondulations des parois', description: 'Nombre de vagues ou crénelures le long des parois latérales.' },
+    en: { label: 'Wall Waves / Ribs', description: 'Number of waves or stepped notches along the side walls.' }
+  },
+  CUSTOM_WAVE_AMPLITUDE: {
+    fr: { label: 'Profondeur des parois', description: 'Intensité du relief et des paliers de rebond latéraux.' },
+    en: { label: 'Wall Wave Amplitude', description: 'Depth of the side wall ripples and bounce ledges.' }
+  },
+  CUSTOM_BOTTOM_WAVE_COUNT: {
+    fr: { label: 'Ondulations du sol / fond', description: 'Nombre de bosses et creux sur le sol du fond du conteneur.' },
+    en: { label: 'Floor Waves / Bumps', description: 'Number of bumps and valleys on the container bottom floor.' }
+  },
+  CUSTOM_BOTTOM_WAVE_AMPLITUDE: {
+    fr: { label: 'Hauteur des bosses du sol', description: 'Hauteur du relief du fond où les billes roulent et se calent.' },
+    en: { label: 'Floor Wave Height', description: 'Height of the bottom floor terrain relief for ball stacking.' }
+  },
+  CUSTOM_BOTTOM_WAVE_STYLE: {
+    fr: { label: 'Style du relief du fond', description: 'Vagues douces arrondies ou piques triangulaires pointues.' },
+    en: { label: 'Floor Relief Style', description: 'Smooth rounded waves or sharp triangular spikes.' }
   },
 
   // --- Ball Duel ---

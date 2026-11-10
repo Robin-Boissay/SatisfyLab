@@ -6,6 +6,7 @@ export interface BaseConfigField {
   type: ConfigFieldType;
   category?: 'physics' | 'visuals' | 'gameplay' | 'audio' | 'texts';
   description?: string;
+  visibleIf?: (values: Record<string, any>) => boolean;
 }
 
 export interface RangeConfigField extends BaseConfigField {

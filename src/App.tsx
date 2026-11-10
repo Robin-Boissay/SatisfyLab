@@ -3,12 +3,15 @@ import { GAMES_REGISTRY, getGameById } from './core/registry';
 import { GameHUDState, GameInstance } from './core/types';
 import { GameViewport } from './components/GameViewport';
 import { SettingsPanel } from './components/SettingsPanel';
+import { LeftSettingsPanel } from './components/LeftSettingsPanel';
+import { RightSettingsPanel } from './components/RightSettingsPanel';
 import { HubHome } from './components/HubHome';
 import { sound } from './core/SoundEngine';
 import { useVideoRecorder } from './core/useVideoRecorder';
 import { useLanguage, Language } from './core/i18n';
 import { LanguageToggle } from './components/LanguageToggle';
-import { ArrowLeft, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Sparkles, SlidersHorizontal, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
+import { CUSTOM_SHAPE_PRESETS, CustomShapePreset } from './games/merge-drop/types';
 
 export const App: React.FC = () => {
   const { language, t, getGameMeta, getDefaultTexts } = useLanguage();
@@ -28,6 +31,30 @@ export const App: React.FC = () => {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
 
+  // État de réduction des panneaux latéraux (persistant via localStorage)
+  const [isLeftCollapsed, setIsLeftCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('satisfylab_left_panel_collapsed') === 'true';
+  });
+  const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('satisfylab_right_panel_collapsed') === 'true';
+  });
+
+  const handleToggleLeftPanel = () => {
+    setIsLeftCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('satisfylab_left_panel_collapsed', String(next));
+      return next;
+    });
+  };
+
+  const handleToggleRightPanel = () => {
+    setIsRightCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('satisfylab_right_panel_collapsed', String(next));
+      return next;
+    });
+  };
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameInstanceRef = useRef<GameInstance | null>(null);
 
@@ -36,7 +63,12 @@ export const App: React.FC = () => {
     formattedDuration,
     toggleRecording,
     stopRecording,
-    notification
+    notification,
+    pendingRecording,
+    isConverting,
+    downloadWebM,
+    convertToMp4,
+    dismissExport
   } = useVideoRecorder();
 
   const activeGame = getGameById(activeGameId) || GAMES_REGISTRY[0];
@@ -120,10 +152,21 @@ export const App: React.FC = () => {
 
   // Mise à jour de config en temps réel (sans rechargement, 60 FPS immédiat)
   const handleConfigChange = (key: string, value: any) => {
-    const updated = {
+    let updated = {
       ...activeConfig,
       [key]: value
     };
+
+    // Si l'utilisateur choisit un preset de conteneur, appliquer toutes ses dimensions
+    if (key === 'CUSTOM_PRESET' && CUSTOM_SHAPE_PRESETS[value as CustomShapePreset]) {
+      updated = {
+        ...updated,
+        ...CUSTOM_SHAPE_PRESETS[value as CustomShapePreset],
+        CONTAINER_SHAPE: 'custom' // Bascule automatique sur la forme sur-mesure
+      };
+    } else if (key.startsWith('CUSTOM_') && activeConfig.CONTAINER_SHAPE !== 'custom') {
+      updated.CONTAINER_SHAPE = 'custom';
+    }
 
     setGameConfigs((prev) => ({
       ...prev,
@@ -131,7 +174,7 @@ export const App: React.FC = () => {
     }));
 
     if (gameInstanceRef.current) {
-      gameInstanceRef.current.updateConfig({ [key]: value });
+      gameInstanceRef.current.updateConfig(updated);
     }
   };
 
@@ -201,15 +244,33 @@ export const App: React.FC = () => {
     );
   }
 
-  // 2. PAGE DE JEU EN COURS (VIEWPORT 9:16 + PARAMÈTRES)
+  // 2. PAGE DE JEU EN COURS (LAYOUT PC : GAUCHE + VIEWPORT 9:16 AU CENTRE + DROITE)
   return (
-    <div className="flex flex-col lg:flex-row h-screen w-screen overflow-x-hidden bg-[#080a0f] text-slate-100">
+    <div className="flex flex-col lg:flex-row h-screen w-screen overflow-hidden bg-[#080a0f] text-slate-100 select-none">
       <LanguageToggle />
 
+      {/* Panneau GAUCHE (Desktop) : Visuels, Formes du Conteneur & Textes */}
+      <LeftSettingsPanel
+        activeGame={activeGame}
+        activeGameId={activeGameId}
+        config={activeConfig}
+        onSelectGame={(id) => {
+          if (isRecording) {
+            stopRecording();
+          }
+          setActiveGameId(id);
+        }}
+        onBackToHub={handleBackToHub}
+        onConfigChange={handleConfigChange}
+        onResetConfig={handleResetConfig}
+        isCollapsed={isLeftCollapsed}
+        onToggleCollapse={handleToggleLeftPanel}
+      />
+
       {/* Zone Principale de Jeu (Centrée avec vue 9:16) */}
-      <main className="flex-1 flex flex-col items-center justify-between p-2 sm:p-4 lg:p-5 overflow-hidden">
+      <main className="flex-1 flex flex-col items-center justify-between p-2 sm:p-3 lg:p-4 min-w-0 h-full overflow-hidden">
         {/* Barre supérieure rapide de navigation */}
-        <div className="w-full max-w-[500px] flex items-center justify-between pb-2 text-xs font-mono pr-28 lg:pr-0">
+        <div className="w-full max-w-[500px] flex items-center justify-between pb-1.5 text-xs font-mono pr-28 lg:pr-0">
           <button
             onClick={handleBackToHub}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-cyan-400 border border-slate-800 transition-all group"
@@ -220,9 +281,35 @@ export const App: React.FC = () => {
 
           <div className="flex items-center gap-2 text-slate-400">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-            <span className="text-[11px] font-bold text-slate-200 tracking-wider uppercase">
+            <span className="text-[11px] font-bold text-slate-200 tracking-wider uppercase truncate max-w-[150px] sm:max-w-none">
               {getGameMeta(activeGame.id).name || activeGame.name}
             </span>
+          </div>
+
+          {/* Raccourcis pour rouvrir rapidement les panneaux sur desktop s'ils sont réduits */}
+          <div className="hidden lg:flex items-center gap-1.5">
+            {isLeftCollapsed && (
+              <button
+                type="button"
+                onClick={handleToggleLeftPanel}
+                className="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-[10px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-all shadow-sm"
+                title={language === 'fr' ? 'Afficher les visuels (Gauche)' : 'Show visuals (Left)'}
+              >
+                <PanelLeftOpen className="w-3.5 h-3.5" />
+                <span>{language === 'fr' ? 'Visuels' : 'Visuals'}</span>
+              </button>
+            )}
+            {isRightCollapsed && (
+              <button
+                type="button"
+                onClick={handleToggleRightPanel}
+                className="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-[10px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-all shadow-sm"
+                title={language === 'fr' ? 'Afficher le moteur & gameplay (Droite)' : 'Show engine & gameplay (Right)'}
+              >
+                <PanelRightOpen className="w-3.5 h-3.5" />
+                <span>{language === 'fr' ? 'Moteur' : 'Engine'}</span>
+              </button>
+            )}
           </div>
 
           <button
@@ -247,11 +334,32 @@ export const App: React.FC = () => {
             recordingDuration={formattedDuration}
             onToggleRecord={() => toggleRecording(canvasRef.current, activeGameId)}
             notification={notification}
+            pendingRecording={pendingRecording}
+            isConverting={isConverting}
+            onDownloadWebM={downloadWebM}
+            onConvertToMp4={convertToMp4}
+            onDismissExport={dismissExport}
           />
         </div>
       </main>
 
-      {/* Panneau de Contrôles & Réglages */}
+      {/* Panneau DROIT (Desktop) : Moteur Physique, Gameplay & Commandes rapides */}
+      <RightSettingsPanel
+        activeGame={activeGame}
+        config={activeConfig}
+        onConfigChange={handleConfigChange}
+        onResetConfig={handleResetConfig}
+        onResetGame={handleResetGame}
+        isMuted={isMuted}
+        onToggleMute={handleToggleMute}
+        isRecording={isRecording}
+        recordingDuration={formattedDuration}
+        onToggleRecord={() => toggleRecording(canvasRef.current, activeGameId)}
+        isCollapsed={isRightCollapsed}
+        onToggleCollapse={handleToggleRightPanel}
+      />
+
+      {/* Tiroir Mobile (Écrans < lg) : Tous les réglages en un seul tiroir */}
       <SettingsPanel
         activeGame={activeGame}
         activeGameId={activeGameId}

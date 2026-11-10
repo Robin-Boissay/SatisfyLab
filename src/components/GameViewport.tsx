@@ -1,8 +1,9 @@
 import React, { useRef, useEffect } from 'react';
 import { GameHUDState, GameInstance } from '../core/types';
 import { useLanguage } from '../core/i18n';
-import { Volume2, VolumeX, RotateCcw, Maximize2, Play, Zap } from 'lucide-react';
+import { Volume2, VolumeX, RotateCcw, Maximize2, Play, Zap, Film, Sparkles, Download, Loader2, X } from 'lucide-react';
 import { sound } from '../core/SoundEngine';
+import { PendingRecording } from '../core/useVideoRecorder';
 
 interface GameViewportProps {
   gameInstance: GameInstance | null;
@@ -15,6 +16,11 @@ interface GameViewportProps {
   recordingDuration?: string;
   onToggleRecord?: () => void;
   notification?: string | null;
+  pendingRecording?: PendingRecording | null;
+  isConverting?: boolean;
+  onDownloadWebM?: () => void;
+  onConvertToMp4?: () => void;
+  onDismissExport?: () => void;
 }
 
 export const GameViewport: React.FC<GameViewportProps> = ({
@@ -27,7 +33,12 @@ export const GameViewport: React.FC<GameViewportProps> = ({
   isRecording = false,
   recordingDuration = '00:00',
   onToggleRecord,
-  notification
+  notification,
+  pendingRecording,
+  isConverting = false,
+  onDownloadWebM,
+  onConvertToMp4,
+  onDismissExport
 }) => {
   const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,6 +117,94 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           <p className="text-sm font-bold text-white tracking-widest uppercase text-center px-4">
             {hudState.overlayPromptText || hudState.statusText || t('viewport.click_to_play')}
           </p>
+        </div>
+      )}
+
+      {/* Modal d'exportation avec convertisseur WebM -> MP4 intégré */}
+      {pendingRecording && (
+        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-[340px] rounded-2xl bg-[#0c101c] border border-cyan-500/60 p-5 shadow-2xl flex flex-col gap-4 text-left animate-in fade-in zoom-in-95 duration-200">
+            {/* Entête */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-neon-cyan">
+                  <Film className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white">{t('recorder.modal_title')}</h3>
+                  <p className="text-[10px] text-cyan-300 font-mono">1080×1920 • 60 FPS • {pendingRecording.formattedDuration}</p>
+                </div>
+              </div>
+              <button
+                onClick={onDismissExport}
+                disabled={isConverting}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-40"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {t('recorder.modal_desc')}
+            </p>
+
+            {/* Boutons d'action */}
+            <div className="flex flex-col gap-2.5">
+              {/* Option 1 : Convertir en MP4 */}
+              <button
+                onClick={onConvertToMp4}
+                disabled={isConverting}
+                className="group relative w-full p-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs flex flex-col gap-0.5 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all disabled:opacity-60 disabled:cursor-not-allowed text-left"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-1.5 font-extrabold text-[12px]">
+                    {isConverting ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 fill-current" />
+                    )}
+                    <span>
+                      {isConverting ? t('recorder.converting_mp4') : t('recorder.btn_mp4')}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono font-black uppercase px-1.5 py-0.5 rounded bg-black/20 text-black">
+                    .MP4
+                  </span>
+                </div>
+                <span className="text-[10px] font-medium text-slate-900/80">
+                  {t('recorder.btn_mp4_subtitle')}
+                </span>
+              </button>
+
+              {/* Option 2 : Télécharger en WebM */}
+              <button
+                onClick={onDownloadWebM}
+                disabled={isConverting}
+                className="w-full p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-semibold flex flex-col gap-0.5 border border-slate-700/80 hover:border-slate-600 transition-all disabled:opacity-50 text-left"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-1.5 font-bold text-[11px] text-slate-200">
+                    <Download className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{t('recorder.btn_webm')}</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                    .WEBM
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-normal">
+                  {t('recorder.btn_webm_subtitle')}
+                </span>
+              </button>
+            </div>
+
+            <button
+              onClick={onDismissExport}
+              disabled={isConverting}
+              className="text-[11px] text-slate-500 hover:text-slate-400 text-center transition-colors pt-1"
+            >
+              {t('recorder.modal_close')}
+            </button>
+          </div>
         </div>
       )}
 

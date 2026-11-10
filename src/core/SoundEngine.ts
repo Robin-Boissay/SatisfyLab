@@ -44,11 +44,32 @@ export class SoundEngine {
     if (!this.ctx) {
       this.init();
     }
-    if (this.streamDest && this.streamDest.stream) {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    if (!this.ctx || !this.masterGain) return null;
+
+    // Vérifier si streamDest existe et si sa piste audio est toujours active ('live')
+    const currentTrack = this.streamDest?.stream?.getAudioTracks()[0];
+    if (this.streamDest && currentTrack && currentTrack.readyState === 'live') {
+      return currentTrack;
+    }
+
+    // Si la piste est terminée ('ended') ou inexistante, recréer un MediaStreamDestination frais
+    try {
+      if (this.streamDest) {
+        try {
+          this.masterGain.disconnect(this.streamDest);
+        } catch (_) {}
+      }
+      this.streamDest = this.ctx.createMediaStreamDestination();
+      this.masterGain.connect(this.streamDest);
       const tracks = this.streamDest.stream.getAudioTracks();
       return tracks.length > 0 ? tracks[0] : null;
+    } catch (e) {
+      console.warn('Erreur création MediaStreamDestination audio:', e);
+      return null;
     }
-    return null;
   }
 
   public toggleMute(): boolean {

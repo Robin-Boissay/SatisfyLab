@@ -39,9 +39,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const currentMeta = getGameMeta(activeGame.id);
 
   return (
-    <aside className="w-full lg:w-96 flex-shrink-0 flex flex-col bg-slate-950/70 border-t lg:border-t-0 lg:border-l border-slate-800/80 backdrop-blur-md transition-all">
+    <aside className="lg:hidden w-full flex-shrink-0 flex flex-col bg-slate-950/95 border-t border-slate-800/80 backdrop-blur-md transition-all z-30">
       {/* Mobile Drawer Header Toggle */}
-      <div className="lg:hidden p-3 border-b border-slate-800 flex items-center justify-between gap-2">
+      <div className="p-3 border-b border-slate-800 flex items-center justify-between gap-2">
         <button
           onClick={onBackToHub}
           className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-xs font-semibold text-cyan-400 flex items-center gap-1.5 flex-shrink-0"
@@ -62,11 +62,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </button>
       </div>
 
-      {/* Main Content Area (Always visible on desktop, toggleable on mobile) */}
+      {/* Main Content Area (Toggleable on mobile) */}
       <div
         className={`${
-          isOpenMobile ? 'block' : 'hidden lg:block'
-        } p-4 space-y-5 overflow-y-auto max-h-[60vh] lg:max-h-[100vh]`}
+          isOpenMobile ? 'block' : 'hidden'
+        } p-4 space-y-5 overflow-y-auto max-h-[60vh]`}
       >
         {/* Header / Brand & Return to Hub */}
         <div className="hidden lg:flex items-center justify-between pb-3 border-b border-slate-800">
