@@ -6,6 +6,25 @@
 export type SoundMergeStyle = 'bubbly' | 'marimba' | 'arcade' | 'cartoon' | 'crystal';
 export type SoundCollisionStyle = 'wood' | 'glass' | 'bubble' | 'rubber' | 'arcade';
 
+export type BallSoundInstrument = 'piano' | 'marimba' | 'synth' | 'bubbly' | '8bit';
+export type BallMelodyPreset = 'pentatonic' | 'chromatic' | 'megalovania' | 'coffin-dance' | 'interstellar' | 'fur-elise' | 'pirates';
+export type BallBreakStyle = 'crunch' | 'glass' | 'laser' | 'boom';
+
+export interface PlayBallBounceOptions {
+  instrument?: BallSoundInstrument;
+  melodyPreset?: BallMelodyPreset;
+  volume?: number;
+  pitchMult?: number;
+  speedRatio?: number;
+  comboIndex?: number;
+}
+
+export interface PlayBallBreakOptions {
+  style?: BallBreakStyle;
+  volume?: number;
+  pitchMult?: number;
+}
+
 export interface PlayMergeOptions {
   style?: SoundMergeStyle;
   volume?: number;
@@ -95,6 +114,16 @@ export class SoundEngine {
     }
   }
 
+  public getContext(): AudioContext | null {
+    if (!this.ctx) this.init();
+    return this.ctx;
+  }
+
+  public getMasterGain(): GainNode | null {
+    if (!this.masterGain) this.init();
+    return this.masterGain;
+  }
+
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
     if (this.masterGain && this.ctx) {
@@ -103,99 +132,302 @@ export class SoundEngine {
     return this.isMuted;
   }
 
+  private lastBallBounceTime: number = 0;
+
+  private static VIRAL_MELODIES: Record<BallMelodyPreset, number[]> = {
+    pentatonic: [220, 246.94, 277.18, 329.63, 369.99, 440, 493.88, 554.37, 659.25, 739.99, 880],
+    chromatic: [220, 233.08, 246.94, 261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440, 466.16, 493.88, 523.25, 554.37, 587.33, 622.25, 659.25, 698.46, 739.99, 783.99, 830.61, 880],
+    megalovania: [293.66, 293.66, 587.33, 440.00, 415.30, 392.00, 349.23, 293.66, 349.23, 392.00, 261.63, 261.63, 587.33, 440.00, 415.30, 392.00, 349.23, 293.66, 349.23, 392.00, 246.94, 246.94, 587.33, 440.00, 415.30, 392.00, 349.23, 293.66, 349.23, 392.00, 233.08, 233.08, 587.33, 440.00, 415.30, 392.00, 349.23, 293.66, 349.23, 392.00],
+    'coffin-dance': [349.23, 349.23, 349.23, 349.23, 440.00, 392.00, 349.23, 523.25, 466.16, 440.00, 392.00, 392.00, 392.00, 440.00, 392.00, 349.23, 329.63, 349.23],
+    interstellar: [440.00, 659.25, 440.00, 659.25, 493.88, 659.25, 523.25, 659.25, 440.00, 659.25, 493.88, 659.25, 587.33, 659.25, 523.25, 659.25],
+    'fur-elise': [659.25, 622.25, 659.25, 622.25, 659.25, 493.88, 587.33, 523.25, 440.00, 261.63, 329.63, 440.00, 493.88, 329.63, 415.30, 493.88, 523.25],
+    pirates: [293.66, 349.23, 392.00, 392.00, 392.00, 440.00, 466.16, 466.16, 466.16, 523.25, 440.00, 440.00, 392.00, 349.23, 349.23, 392.00]
+  };
+
   public playBounce(bounceIndex: number, speedRatio: number = 0.5) {
+    this.playBallBounce(bounceIndex, { speedRatio });
+  }
+
+  public playBallBounce(bounceIndex: number, options?: PlayBallBounceOptions) {
     if (!this.ctx || this.isMuted) return;
 
     const now = this.ctx.currentTime;
-    const pentatonicScale = [0, 2, 4, 7, 9];
-    const step = bounceIndex % 30;
-    const octave = Math.floor(step / pentatonicScale.length);
-    const semitone = pentatonicScale[step % pentatonicScale.length] + octave * 12;
-    const targetFreq = Math.min(800, this.baseFreq * Math.pow(2, semitone / 24));
+    // Throttling strict (30ms) pour éviter la distorsion lors des vagues de 50+ billes
+    if (now - this.lastBallBounceTime < 0.028) return;
+    this.lastBallBounceTime = now;
 
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+    const instrument: BallSoundInstrument = options?.instrument || 'piano';
+    const melody: BallMelodyPreset = options?.melodyPreset || 'pentatonic';
+    const volume = Math.max(0, Math.min(1.0, options?.volume !== undefined ? options.volume : 0.8));
+    if (volume <= 0.001) return;
 
-    osc.type = speedRatio > 0.6 ? 'triangle' : 'sine';
-    osc.frequency.setValueAtTime(targetFreq * (1.3 + speedRatio * 0.4), now);
-    osc.frequency.exponentialRampToValueAtTime(targetFreq, now + 0.012);
+    const pitchMult = Math.max(0.4, Math.min(2.5, options?.pitchMult || 1.0));
+    const speedRatio = Math.max(0, Math.min(1.0, options?.speedRatio || 0.4));
+    const comboIndex = Math.max(0, options?.comboIndex || 0);
+    const comboStep = Math.pow(1.05, Math.min(10, comboIndex));
 
-    const dur = 0.085;
-    gain.gain.setValueAtTime(0.001, now);
-    gain.gain.linearRampToValueAtTime(0.7 + speedRatio * 0.3, now + 0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    const melodyNotes = SoundEngine.VIRAL_MELODIES[melody] || SoundEngine.VIRAL_MELODIES.pentatonic;
+    const noteIndex = bounceIndex % melodyNotes.length;
+    const octaveShift = Math.floor(bounceIndex / melodyNotes.length);
+    const rawFreq = melodyNotes[noteIndex] * Math.pow(2, (octaveShift % 2));
+    const targetFreq = Math.min(1800, rawFreq * pitchMult * comboStep);
 
-    osc.connect(gain);
-    gain.connect(this.masterGain!);
+    if (instrument === 'marimba') {
+      // 🪵 Marimba ASMR (Suika Zen) : Fondamentale ronde + 2ème harmonique percutante
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
 
-    osc.start(now);
-    osc.stop(now + dur);
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(targetFreq, now);
+
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(targetFreq * 4.0, now);
+
+      const dur = 0.09;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.9, now + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + dur);
+      osc2.stop(now + dur);
+
+    } else if (instrument === 'synth') {
+      // ⚡ Synth Cyber : Triangle modulée avec filtre passe-bas percussif
+      const osc = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(targetFreq, now);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(targetFreq * 3.5, now);
+      filter.frequency.exponentialRampToValueAtTime(targetFreq * 0.8, now + 0.1);
+      filter.Q.setValueAtTime(4.0, now);
+
+      const dur = 0.11;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.75, now + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(now);
+      osc.stop(now + dur);
+
+    } else if (instrument === 'bubbly') {
+      // 🫧 Pop / Bulle ASMR : pitch sweep ultra-rapide montant
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(targetFreq * 0.75, now);
+      osc.frequency.exponentialRampToValueAtTime(targetFreq * 1.5, now + 0.035);
+
+      const dur = 0.08;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.85, now + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(now);
+      osc.stop(now + dur);
+
+    } else if (instrument === '8bit') {
+      // 👾 Arcade 8-Bit Chiptune : onde carrée avec arpeggio rapide
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(targetFreq, now);
+      osc.frequency.setValueAtTime(targetFreq * 1.25, now + 0.02); // +4 demi-tons
+
+      const dur = 0.07;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.55, now + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(now);
+      osc.stop(now + dur);
+
+    } else {
+      // 🎹 Piano ASMR (Défaut) : Onde sinusoïdale pure + harmonique douce
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc1.type = speedRatio > 0.6 ? 'triangle' : 'sine';
+      osc1.frequency.setValueAtTime(targetFreq * (1.1 + speedRatio * 0.2), now);
+      osc1.frequency.exponentialRampToValueAtTime(targetFreq, now + 0.015);
+
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(targetFreq * 2.0, now);
+
+      const dur = 0.12;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.85, now + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + dur);
+      osc2.stop(now + dur);
+    }
   }
 
   public playWallDestroy() {
+    this.playBallBreak();
+  }
+
+  public playBallBreak(options?: PlayBallBreakOptions) {
     if (!this.ctx || this.isMuted) return;
 
+    const style: BallBreakStyle = options?.style || 'crunch';
+    const volume = Math.max(0, Math.min(1.0, options?.volume !== undefined ? options.volume : 0.85));
+    if (volume <= 0.001) return;
+
+    const pitchMult = Math.max(0.5, Math.min(2.0, options?.pitchMult || 1.0));
     const now = this.ctx.currentTime;
-    const bufferSize = Math.floor(this.ctx.sampleRate * 0.09);
-    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
+
+    if (style === 'glass') {
+      // 🔮 Clink de verre / cristal
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1400 * pitchMult, now);
+      osc.frequency.exponentialRampToValueAtTime(950 * pitchMult, now + 0.1);
+
+      const dur = 0.13;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.7, now + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+
+    } else if (style === 'laser') {
+      // ⚡ Décharge laser
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1600 * pitchMult, now);
+      osc.frequency.exponentialRampToValueAtTime(120 * pitchMult, now + 0.09);
+
+      const dur = 0.1;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.75, now + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+
+    } else if (style === 'boom') {
+      // 💣 Sub-bass boom
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(130 * pitchMult, now);
+      osc.frequency.exponentialRampToValueAtTime(35 * pitchMult, now + 0.16);
+
+      const dur = 0.16;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.9, now + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + dur);
+
+    } else {
+      // 💥 Crunch classique (Bruit blanc filtré + impact sub)
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.08);
+      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+
+      const whiteNoise = this.ctx.createBufferSource();
+      whiteNoise.buffer = noiseBuffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1900 * pitchMult, now);
+      filter.frequency.exponentialRampToValueAtTime(320 * pitchMult, now + 0.08);
+      filter.Q.setValueAtTime(3.2, now);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(volume * 0.8, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      whiteNoise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain!);
+
+      whiteNoise.start(now);
+      whiteNoise.stop(now + 0.08);
+
+      const subOsc = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(140 * pitchMult, now);
+      subOsc.frequency.exponentialRampToValueAtTime(45 * pitchMult, now + 0.11);
+
+      subGain.gain.setValueAtTime(volume * 0.65, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+      subOsc.connect(subGain);
+      subGain.connect(this.masterGain!);
+
+      subOsc.start(now);
+      subOsc.stop(now + 0.11);
     }
-
-    const whiteNoise = this.ctx.createBufferSource();
-    whiteNoise.buffer = noiseBuffer;
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(1800, now);
-    filter.frequency.exponentialRampToValueAtTime(350, now + 0.09);
-    filter.Q.setValueAtTime(3.0, now);
-
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.8, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-
-    whiteNoise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain!);
-
-    whiteNoise.start(now);
-    whiteNoise.stop(now + 0.09);
-
-    const subOsc = this.ctx.createOscillator();
-    const subGain = this.ctx.createGain();
-    subOsc.type = 'sine';
-    subOsc.frequency.setValueAtTime(140, now);
-    subOsc.frequency.exponentialRampToValueAtTime(45, now + 0.12);
-
-    subGain.gain.setValueAtTime(0.6, now);
-    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-
-    subOsc.connect(subGain);
-    subGain.connect(this.masterGain!);
-
-    subOsc.start(now);
-    subOsc.stop(now + 0.12);
   }
 
   public playEscape() {
+    this.playBallEscape();
+  }
+
+  public playBallEscape(volume: number = 0.8) {
     if (!this.ctx || this.isMuted) return;
 
     const now = this.ctx.currentTime;
     const notes = [261.63, 392.0, 523.25, 659.25, 783.99, 987.77, 1046.5, 1318.51];
 
     notes.forEach((freq, idx) => {
-      const noteTime = now + idx * 0.055;
+      const noteTime = now + idx * 0.05;
       const osc = this.ctx!.createOscillator();
       const gain = this.ctx!.createGain();
 
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, noteTime);
 
-      const dur = 0.55 - idx * 0.03;
+      const dur = 0.5 - idx * 0.025;
       gain.gain.setValueAtTime(0.001, noteTime);
-      gain.gain.linearRampToValueAtTime(0.4, noteTime + 0.015);
+      gain.gain.linearRampToValueAtTime(volume * 0.45, noteTime + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, noteTime + dur);
 
       osc.connect(gain);

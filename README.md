@@ -82,8 +82,9 @@ npm run preview
 
 ---
 
-## 🏗️ Stack Technique
+## 🏗️ Stack Technique & Standard des Jeux
 
+- **Standard Officiel des Jeux :** Consultez [GAME_STANDARDS.md](./GAME_STANDARDS.md) pour les spécifications obligatoires (Safe Zones TikTok 9:16, Audio ASMR, Thèmes IA, HUD Canvas, Panneaux de contrôle).
 - **Framework :** React 18 + TypeScript
 - **Bundler :** Vite 6
 - **Styling :** Tailwind CSS

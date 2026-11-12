@@ -12,6 +12,28 @@ export const mergeDropConfigSchema: ConfigSchema = {
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.SKIN_THEME,
     description: 'Change l’apparence des astres / orbes / skins. Studio IA : /theme-studio.html'
   },
+  RENDER_MODE: {
+    id: 'RENDER_MODE',
+    label: 'Moteur de Rendu Graphique',
+    type: 'select',
+    category: 'visuals',
+    options: [
+      { label: '🎨 Rendu 2D Flat & Néon (Classique)', value: '2d' },
+      { label: '🔮 Rendu 3D Photoréaliste (Three.js ASMR)', value: '3d' }
+    ],
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.RENDER_MODE,
+    description: 'Basculez entre le style 2D fluide avec halos néon ou le rendu 3D Three.js avec sphères brillantes et verre transparent.'
+  },
+  ACTIVE_TIERS: {
+    id: 'ACTIVE_TIERS',
+    label: 'Billes Actives du Thème',
+    type: 'tier-list',
+    category: 'visuals',
+    minCount: 5,
+    maxCount: 10,
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.ACTIVE_TIERS,
+    description: 'Cochez ou décochez les billes à inclure dans la partie (min 5, max 10).'
+  },
   CONTAINER_SHAPE: {
     id: 'CONTAINER_SHAPE',
     label: 'Forme du Contenant',
@@ -32,16 +54,22 @@ export const mergeDropConfigSchema: ConfigSchema = {
     type: 'select',
     category: 'visuals',
     options: [
-      { label: '⚡ Cyan Néon', value: '#00f0ff' },
-      { label: '💖 Rose Magenta', value: '#ff007f' },
-      { label: '☀️ Or Solaire', value: '#ffd700' },
-      { label: '🌿 Vert Laser', value: '#00ff88' },
-      { label: '🔮 Violet Cosmique', value: '#b026ff' },
-      { label: '🔥 Orange Plasma', value: '#ff6d00' },
-      { label: '🤍 Blanc Pur', value: '#ffffff' }
+      { label: '🌈 Arc-en-ciel Animé RGB', value: 'rainbow' },
+      { label: '⚡ Cyan Électrique', value: '#00f0ff' },
+      { label: '💖 Rose Néon Fluo', value: '#ff007f' },
+      { label: '🔥 Rose Bonbon Barbie', value: '#ff1493' },
+      { label: '☀️ Or Solaire Brillant', value: '#ffd700' },
+      { label: '🍋 Jaune Cyber Fluo', value: '#ffee00' },
+      { label: '🌿 Vert Laser Fluo', value: '#00ff66' },
+      { label: '🧪 Vert Toxique Acid', value: '#39ff14' },
+      { label: '🔥 Orange Fluo Intense', value: '#ff5500' },
+      { label: '🔮 Violet Néon Ultra', value: '#bf00ff' },
+      { label: '🟣 Mauve Fluo Disco', value: '#e000ff' },
+      { label: '💎 Bleu Turquoise Flash', value: '#00e5ff' },
+      { label: '🤍 Blanc Pur Éclatant', value: '#ffffff' }
     ],
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.CONTAINER_COLOR,
-    description: 'Personnalise la couleur néon des parois du réceptacle.'
+    description: 'Personnalise la couleur néon ultra-flashy ou arc-en-ciel animé du conteneur.'
   },
   BACKGROUND_COLOR: {
     id: 'BACKGROUND_COLOR',
@@ -49,14 +77,23 @@ export const mergeDropConfigSchema: ConfigSchema = {
     type: 'select',
     category: 'visuals',
     options: [
-      { label: '🌌 Noir Spatial', value: '#06080d' },
-      { label: '⬛ Noir Pur OLED', value: '#000000' },
+      // Fonds sombres ultra-contrastés (font ressortir les néons)
+      { label: '🌌 Noir Spatial Profond', value: '#06080d' },
+      { label: '⬛ Noir OLED Absolu', value: '#000000' },
       { label: '🟣 Nébuleuse Sombre', value: '#0a0518' },
-      { label: '🔵 Bleu Cyber Abyssal', value: '#030c18' },
-      { label: '🔴 Rouge Minuit', value: '#14040a' }
+      { label: '🔵 Bleu Nuit Abyssal', value: '#020b18' },
+      // Fonds flashy vibrants & dynamiques pour TikTok
+      { label: '🔮 Indigo / Cyber Synthwave', value: '#15082b' },
+      { label: '🍷 Magenta / Minuit Pop', value: '#240019' },
+      { label: '🌊 Bleu Océan Profond', value: '#001a33' },
+      { label: '🌲 Vert Émeraude Sombre', value: '#001a12' },
+      { label: '🔥 Rouge Braise Sombre', value: '#1a0408' },
+      { label: '💜 Violet Vibrant Électrique', value: '#28004d' },
+      { label: '💖 Rose Cyber Punk', value: '#3b0024' },
+      { label: '💎 Bleu Cyan Cobalt', value: '#002244' }
     ],
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.BACKGROUND_COLOR,
-    description: 'Teinte de base de l’arrière-plan du Canvas.'
+    description: 'Teinte de base ou fond vibrant du Canvas pour faire ressortir les billes.'
   },
   BACKGROUND_EFFECT: {
     id: 'BACKGROUND_EFFECT',
@@ -81,6 +118,22 @@ export const mergeDropConfigSchema: ConfigSchema = {
     category: 'visuals',
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.SHOW_EVOLUTION_BAR,
     description: 'Affiche les 10 cercles qui se débloquent avec le palier max (idéal rétention vidéo).'
+  },
+  SHOW_BALL_OUTLINE: {
+    id: 'SHOW_BALL_OUTLINE',
+    label: 'Cercles & Halos autour des billes',
+    type: 'boolean',
+    category: 'visuals',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SHOW_BALL_OUTLINE,
+    description: 'Affiche ou masque les cercles lumineux et liserés tracés autour des billes (pratique à décocher si vos images n’ont pas une forme 100% ronde).'
+  },
+  SHOW_HITBOX_DEBUG: {
+    id: 'SHOW_HITBOX_DEBUG',
+    label: 'Visualiser la Hitbox Ronde (Debug)',
+    type: 'boolean',
+    category: 'visuals',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.SHOW_HITBOX_DEBUG,
+    description: 'Trace le cercle physique de collision exact en pointillé vert/cyan pour ajuster visuellement la hitbox par rapport à vos images.'
   },
   SHOW_TOP_HUD: {
     id: 'SHOW_TOP_HUD',
@@ -335,15 +388,76 @@ export const mergeDropConfigSchema: ConfigSchema = {
   },
   AUTO_STREAM_RATE: {
     id: 'AUTO_STREAM_RATE',
-    label: 'Cadence de tir (billes/seconde)',
+    label: 'Cadence de tir fixe (billes/seconde)',
     type: 'range',
     category: 'gameplay',
+    visibleIf: (values) => !values.AUTO_STREAM_RAMP_ENABLED,
     min: 1,
     max: 20,
     step: 1,
     unit: 'billes/s',
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.AUTO_STREAM_RATE,
-    description: 'Nombre de billes lâchées par seconde en mode automatique.'
+    description: 'Cadence constante si l’accélération progressive est désactivée.'
+  },
+  AUTO_STREAM_RAMP_ENABLED: {
+    id: 'AUTO_STREAM_RAMP_ENABLED',
+    label: 'Accélération Progressive de Tir (TikTok)',
+    type: 'boolean',
+    category: 'gameplay',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.AUTO_STREAM_RAMP_ENABLED,
+    description: 'Démarre lentement pour poser le décor puis accélère par paliers jusqu’à une pluie intense de billes.'
+  },
+  AUTO_STREAM_START_RATE: {
+    id: 'AUTO_STREAM_START_RATE',
+    label: 'Cadence Initiale de Démarrage',
+    type: 'range',
+    category: 'gameplay',
+    visibleIf: (values) => values.AUTO_STREAM_RAMP_ENABLED === true,
+    min: 1,
+    max: 10,
+    step: 1,
+    unit: 'billes/s',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.AUTO_STREAM_START_RATE,
+    description: 'Vitesse de tir au début de la partie (ex: 2 billes/s).'
+  },
+  AUTO_STREAM_MAX_RATE: {
+    id: 'AUTO_STREAM_MAX_RATE',
+    label: 'Cadence Maximale Plafond',
+    type: 'range',
+    category: 'gameplay',
+    visibleIf: (values) => values.AUTO_STREAM_RAMP_ENABLED === true,
+    min: 2,
+    max: 20,
+    step: 1,
+    unit: 'billes/s',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.AUTO_STREAM_MAX_RATE,
+    description: 'Vitesse de tir maximale atteinte en fin de montée (ex: 10 billes/s).'
+  },
+  AUTO_STREAM_RAMP_STEP: {
+    id: 'AUTO_STREAM_RAMP_STEP',
+    label: 'Augmentation par Palier (+X billes/s)',
+    type: 'range',
+    category: 'gameplay',
+    visibleIf: (values) => values.AUTO_STREAM_RAMP_ENABLED === true,
+    min: 0.5,
+    max: 5,
+    step: 0.5,
+    unit: 'billes/s',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.AUTO_STREAM_RAMP_STEP,
+    description: 'Combien de billes par seconde on ajoute à chaque palier (ex: +1).'
+  },
+  AUTO_STREAM_RAMP_INTERVAL: {
+    id: 'AUTO_STREAM_RAMP_INTERVAL',
+    label: 'Intervalle d’Accélération (Toutes les X secondes)',
+    type: 'range',
+    category: 'gameplay',
+    visibleIf: (values) => values.AUTO_STREAM_RAMP_ENABLED === true,
+    min: 1,
+    max: 15,
+    step: 1,
+    unit: 's',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.AUTO_STREAM_RAMP_INTERVAL,
+    description: 'Délai en secondes entre chaque accélération de la cadence (ex: toutes les 4 secondes).'
   },
   SPAWN_MAX_TIER: {
     id: 'SPAWN_MAX_TIER',
@@ -369,6 +483,18 @@ export const mergeDropConfigSchema: ConfigSchema = {
     unit: 'px',
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.BASE_BALL_RADIUS,
     description: "Rayon de la plus petite bille (niveau 0). Toutes les autres sphères s'adaptent proportionnellement."
+  },
+  BALL_HITBOX_SCALE: {
+    id: 'BALL_HITBOX_SCALE',
+    label: 'Taille Hitbox vs Image',
+    type: 'range',
+    category: 'physics',
+    min: 0.60,
+    max: 1.40,
+    step: 0.02,
+    unit: 'x',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.BALL_HITBOX_SCALE,
+    description: 'Ajuste la taille de la zone de collision ronde par rapport à l’image (ex: 0.85 = hitbox 15% plus petite pour des contacts plus serrés ; 1.15 = coussin invisible autour de l’image).'
   },
   GRAVITY: {
     id: 'GRAVITY',
@@ -443,9 +569,10 @@ export const mergeDropConfigSchema: ConfigSchema = {
     type: 'range',
     category: 'audio',
     visibleIf: (values) => values.SOUND_MERGE_ENABLED !== false,
-    min: 0.1,
-    max: 1.0,
-    step: 0.05,
+    min: 0,
+    max: 100,
+    step: 5,
+    unit: '%',
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_MERGE_VOLUME,
     description: 'Dose l’intensité du son de fusion.'
   },
@@ -479,9 +606,10 @@ export const mergeDropConfigSchema: ConfigSchema = {
     type: 'range',
     category: 'audio',
     visibleIf: (values) => values.SOUND_COLLISION_ENABLED !== false,
-    min: 0.05,
-    max: 1.0,
-    step: 0.05,
+    min: 0,
+    max: 100,
+    step: 5,
+    unit: '%',
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_COLLISION_VOLUME,
     description: 'Ajuste le niveau sonore des petits chocs physiques.'
   },
@@ -509,8 +637,111 @@ export const mergeDropConfigSchema: ConfigSchema = {
     min: 0.7,
     max: 1.4,
     step: 0.05,
+    unit: 'x',
     defaultValue: DEFAULT_MERGE_DROP_CONFIG.SOUND_PITCH,
     description: 'Rend l’ensemble des sons plus grave (lourd) ou plus aigu (kawaii).'
+  },
+  VOICE_ANNOUNCER_ENABLED: {
+    id: 'VOICE_ANNOUNCER_ENABLED',
+    label: '🗣️ Voix IA Annonceur (Trend TikTok)',
+    type: 'boolean',
+    category: 'audio',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.VOICE_ANNOUNCER_ENABLED,
+    description: 'Une voix IA annonce le nom de chaque fusion avec un pitch et un tempo de plus en plus graves et lents.'
+  },
+  VOICE_ANNOUNCER_MODE: {
+    id: 'VOICE_ANNOUNCER_MODE',
+    label: 'Moteur Vocal & Style',
+    type: 'select',
+    category: 'audio',
+    visibleIf: (values) => values.VOICE_ANNOUNCER_ENABLED === true,
+    options: [
+      { label: '⚡ Nom du Palier (Web Audio 0ms Instantané)', value: 'tier_name' },
+      { label: '🥔 Répéter "Patate" (Trend TikTok Pure 0ms)', value: 'repeat_prefix' },
+      { label: '🌐 Synthèse Vocale Navigateur (Dynamique)', value: 'speech_synthesis' }
+    ],
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.VOICE_ANNOUNCER_MODE,
+    description: 'Les modes Web Audio 0ms démarrent instantanément dès le contact des billes sans aucun temps de chargement.'
+  },
+  VOICE_ANNOUNCER_PREFIX: {
+    id: 'VOICE_ANNOUNCER_PREFIX',
+    label: 'Préfixe Vocal (ex: Patate)',
+    type: 'text',
+    category: 'audio',
+    visibleIf: (values) => values.VOICE_ANNOUNCER_ENABLED === true,
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.VOICE_ANNOUNCER_PREFIX,
+    description: 'Texte facultatif répété avant chaque annonce (ex: "Patate", "C\'est une", ou laisser vide).'
+  },
+  VOICE_ANNOUNCER_PITCH_BASE: {
+    id: 'VOICE_ANNOUNCER_PITCH_BASE',
+    label: 'Tonalité Initiale (Palier 1 - Aigu)',
+    type: 'range',
+    category: 'audio',
+    visibleIf: (values) => values.VOICE_ANNOUNCER_ENABLED === true,
+    min: 0.8,
+    max: 2.0,
+    step: 0.05,
+    unit: 'x',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.VOICE_ANNOUNCER_PITCH_BASE,
+    description: 'Hauteur de note pour le premier palier fusionné (plus la valeur est haute, plus la voix est aiguë et cartoon).'
+  },
+  VOICE_ANNOUNCER_RATE_BASE: {
+    id: 'VOICE_ANNOUNCER_RATE_BASE',
+    label: 'Vitesse Initiale (Palier 1 - Rapide)',
+    type: 'range',
+    category: 'audio',
+    visibleIf: (values) => values.VOICE_ANNOUNCER_ENABLED === true,
+    min: 0.8,
+    max: 2.0,
+    step: 0.05,
+    unit: 'x',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.VOICE_ANNOUNCER_RATE_BASE,
+    description: 'Vitesse d’élocution pour le premier palier fusionné (plus la valeur est haute, plus la voix parle vite).'
+  },
+  VOICE_ANNOUNCER_PITCH_MIN: {
+    id: 'VOICE_ANNOUNCER_PITCH_MIN',
+    label: 'Gravité Maximale (Palier Final - Grave)',
+    type: 'range',
+    category: 'audio',
+    visibleIf: (values) => values.VOICE_ANNOUNCER_ENABLED === true,
+    min: 0.15,
+    max: 0.8,
+    step: 0.05,
+    unit: 'x',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.VOICE_ANNOUNCER_PITCH_MIN,
+    description: 'Tonalité de la voix pour le palier géant (plus la valeur est basse, plus la voix est sombre et démoniaque).'
+  },
+  VOICE_ANNOUNCER_RATE_MIN: {
+    id: 'VOICE_ANNOUNCER_RATE_MIN',
+    label: 'Vitesse Finale (Palier Final - Lent)',
+    type: 'range',
+    category: 'audio',
+    visibleIf: (values) => values.VOICE_ANNOUNCER_ENABLED === true,
+    min: 0.4,
+    max: 1.2,
+    step: 0.05,
+    unit: 'x',
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.VOICE_ANNOUNCER_RATE_MIN,
+    description: 'Vitesse d’élocution pour le palier géant (plus la valeur est basse, plus la voix est ralentie et lourde).'
+  },
+  VOICE_ANNOUNCER_SHOW_POPUP: {
+    id: 'VOICE_ANNOUNCER_SHOW_POPUP',
+    label: 'Pop-up Textuel Flottant au Merge',
+    type: 'boolean',
+    category: 'audio',
+    visibleIf: (values) => values.VOICE_ANNOUNCER_ENABLED === true,
+    defaultValue: DEFAULT_MERGE_DROP_CONFIG.VOICE_ANNOUNCER_SHOW_POPUP,
+    description: 'Fait jaillir le nom du palier au-dessus de la bille créée avec un effet de rebond dynamique.'
+  },
+  GENERATE_THEME_VOICES: {
+    id: 'GENERATE_THEME_VOICES',
+    label: 'Générer les Voix du Thème Sélectionné',
+    type: 'action-button',
+    actionId: 'GENERATE_THEME_VOICES',
+    buttonText: 'Générer les 10 Voix du Thème Actif (0ms)',
+    category: 'audio',
+    visibleIf: (values) => values.VOICE_ANNOUNCER_ENABLED === true,
+    description: 'Synthétise par IA les 10 paliers du thème actuellement choisi (Patate, Fruits, Légumes, Planètes ou personnalisé) et supprime le silence avec FFmpeg pour un déclenchement instantané à 0.00ms.'
   },
 
   // --- TEXTES AFFICHÉS ---

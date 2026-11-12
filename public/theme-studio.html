@@ -39,12 +39,12 @@
     }
     .main-container {
       display: grid;
-      grid-template-columns: 340px 1fr 340px;
-      gap: 1.5rem;
-      padding: 1.5rem;
+      grid-template-columns: 360px 1fr 340px;
+      gap: 1.25rem;
+      padding: 1.25rem;
       flex: 1;
     }
-    @media (max-width: 1200px) {
+    @media (max-width: 1250px) {
       .main-container { grid-template-columns: 1fr; }
     }
     .panel {
@@ -54,24 +54,24 @@
       padding: 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 1.25rem;
+      gap: 1rem;
     }
     .panel-title {
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: #38bdf8;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      justify-content: space-between;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      padding-bottom: 0.6rem;
+      padding-bottom: 0.5rem;
     }
     .dropzone {
       border: 2px dashed #00f0ff;
-      border-radius: 12px;
-      padding: 2rem 1rem;
+      border-radius: 10px;
+      padding: 1.25rem 1rem;
       text-align: center;
       cursor: pointer;
       background: rgba(0, 240, 255, 0.03);
@@ -81,14 +81,34 @@
       background: rgba(0, 240, 255, 0.1);
       border-color: #ff007f;
     }
-    .dropzone p { font-size: 0.85rem; color: #94a3b8; margin-top: 0.5rem; }
+    .dropzone p { font-size: 0.8rem; color: #94a3b8; margin-top: 0.35rem; }
+
+    .section-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
     .control-group {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.3rem;
     }
     .control-group label {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 600;
       color: #cbd5e1;
       display: flex;
@@ -107,9 +127,9 @@
       background: #1e293b;
       border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 6px;
-      padding: 0.5rem 0.75rem;
+      padding: 0.45rem 0.65rem;
       color: #fff;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-family: inherit;
     }
     .preview-canvas-container {
@@ -122,23 +142,43 @@
       align-items: center;
       justify-content: center;
       position: relative;
-      min-height: 400px;
+      min-height: 480px;
+      width: 100%;
     }
     canvas#sourceCanvas {
       max-width: 100%;
-      max-height: 65vh;
+      max-height: 70vh;
       object-fit: contain;
       cursor: crosshair;
+      user-select: none;
+      touch-action: none;
     }
+    .canvas-hud {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.75rem;
+      color: #94a3b8;
+      pointer-events: none;
+      display: flex;
+      gap: 0.75rem;
+    }
+    .canvas-hud strong { color: #00f0ff; }
+
     .btn {
       background: linear-gradient(135deg, #00f0ff, #0284c7);
       color: #000;
       font-weight: 700;
       border: none;
       border-radius: 8px;
-      padding: 0.75rem 1rem;
+      padding: 0.65rem 1rem;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       transition: all 0.2s;
       display: flex;
       align-items: center;
@@ -159,11 +199,51 @@
       background: #475569;
       box-shadow: none;
     }
+    .btn-magic {
+      background: linear-gradient(135deg, #ec4899, #8b5cf6, #3b82f6);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 0 12px rgba(236, 72, 153, 0.4);
+    }
+    .btn-magic:hover {
+      box-shadow: 0 0 20px rgba(236, 72, 153, 0.7);
+      transform: translateY(-1px) scale(1.01);
+    }
+
+    .tier-pills {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.35rem;
+    }
+    .tier-pill {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 0.35rem 0.2rem;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      text-align: center;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .tier-pill:hover {
+      background: #334155;
+      color: #fff;
+    }
+    .tier-pill.active {
+      background: #0284c7;
+      color: #fff;
+      border-color: #00f0ff;
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+    }
+
     .tiers-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 0.75rem;
-      max-height: 480px;
+      gap: 0.65rem;
+      max-height: 420px;
       overflow-y: auto;
       padding-right: 0.25rem;
     }
@@ -176,18 +256,39 @@
       align-items: center;
       gap: 0.35rem;
       border: 1px solid rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tier-card:hover {
+      border-color: #38bdf8;
+      background: #243248;
+    }
+    .tier-card.active {
+      border-color: #00f0ff;
+      background: rgba(0, 240, 255, 0.08);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
     }
     .tier-card canvas {
-      width: 72px;
-      height: 72px;
+      width: 68px;
+      height: 68px;
       border-radius: 50%;
-      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23334155"><rect width="8" height="8"/><rect x="8" y="8" width="8" height="8"/></svg>') #0f172a;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+      background: repeating-conic-gradient(#334155 0% 25%, #1e293b 0% 50%) 50% / 14px 14px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+      transition: background 0.2s;
+    }
+    .tier-card canvas.bg-dark {
+      background: #06080d !important;
+    }
+    .tier-card canvas.bg-color {
+      background: #4f46e5 !important;
     }
     .tier-card span {
       font-size: 0.7rem;
       font-weight: 600;
       color: #94a3b8;
+    }
+    .tier-card.active span {
+      color: #00f0ff;
     }
     .code-box {
       background: #020617;
@@ -197,9 +298,17 @@
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.7rem;
       color: #38bdf8;
-      max-height: 120px;
+      max-height: 110px;
       overflow-y: auto;
       white-space: pre;
+    }
+    .badge {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0, 240, 255, 0.15);
+      color: #00f0ff;
+      font-weight: 600;
     }
   </style>
 </head>
@@ -213,72 +322,163 @@
   <div class="main-container">
     <!-- PANEL DE GAUCHE : IMPORT & CONTRÔLES -->
     <div class="panel">
-      <div class="panel-title">1. Image & Découpe</div>
+      <div class="panel-title">1. Image & Auto-Ajustement</div>
 
       <div class="dropzone" id="dropzone">
-        <svg width="36" height="36" fill="none" stroke="#00f0ff" stroke-width="2" viewBox="0 0 24 24">
+        <svg width="32" height="32" fill="none" stroke="#00f0ff" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
         </svg>
-        <p><strong>Glissez votre image IA ici</strong><br>ou collez avec Ctrl+V / Cliquez</p>
+        <p><strong>Glissez votre image IA ici</strong><br>ou collez (Ctrl+V) / Cliquez</p>
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
       </div>
 
-      <div class="control-group">
-        <label>Dossier du Thème</label>
-        <input type="text" id="themeIdInput" value="mon_theme" placeholder="ex: sweets, monsters, cars">
+      <!-- BOUTON AUTO AJUSTEMENT -->
+      <button id="autoFitBtn" class="btn btn-magic">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+        </svg>
+        🪄 Auto-Ajuster les 10 Cercles
+      </button>
+
+      <!-- GUIDE PROMPT IA RAPIDE -->
+      <details class="section-box" style="cursor: pointer; border-color: rgba(236, 72, 153, 0.4);">
+        <summary class="section-title" style="cursor: pointer; color: #f472b6;">
+          <span>💡 Comment générer l'image dans l'IA ?</span>
+          <span class="badge" style="background: rgba(236, 72, 153, 0.2); color: #f472b6;">Midjourney / DALL-E</span>
+        </summary>
+        <div style="font-size: 0.73rem; color: #94a3b8; margin-top: 0.4rem; line-height: 1.45;">
+          Les IA (Midjourney/ChatGPT) ne peuvent pas générer directement de sprite sheets transparentes. Demandez simplement un fond noir pur :
+          <div style="background: #020617; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 0.4rem 0.6rem; margin: 0.35rem 0; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #38bdf8;">
+            A neat 5x2 sprite sheet grid showing 10 circular game icons on a solid flat pure black background of [votre thème] --ar 5:2
+          </div>
+          👉 <strong>Le studio efface ensuite automatiquement tout le fond noir</strong> pour vous exporter directement des PNG transparents parfaits !
+        </div>
+      </details>
+
+      <!-- CONFIG DU THÈME -->
+      <div class="section-box">
+        <div class="control-group">
+          <label>Identifiant Dossier</label>
+          <input type="text" id="themeIdInput" value="mon_theme" placeholder="ex: sweets, monsters, cars">
+        </div>
+
+        <div class="control-group">
+          <label>Format de Grille</label>
+          <select id="gridPresetSelect">
+            <option value="5x2" selected>5 colonnes × 2 lignes (Standard)</option>
+            <option value="2x5">2 colonnes × 5 lignes</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>Détourage / Fond Transparent</label>
+          <select id="removeBgSelect">
+            <option value="smart-black" selected>🪄 Détourage Noir Intelligent (Transparent)</option>
+            <option value="chroma-black">⚡ Chroma-Key Noir Direct</option>
+            <option value="smart-white">✨ Détourage Fond Blanc / Clair</option>
+            <option value="circle-mask">⚪ Masque Rond (Garder fond d'origine)</option>
+            <option value="none">❌ Aucun Masque (Image brute)</option>
+          </select>
+        </div>
+
+        <div class="control-group" id="bgToleranceGroup">
+          <label>Tolérance Fond Noir <span id="bgToleranceVal">45</span></label>
+          <input type="range" id="bgToleranceSlider" min="5" max="110" value="45">
+        </div>
+
+        <div class="control-group" id="bgFeatherGroup">
+          <label>Lissage des Bords (Anti-crénelage) <span id="bgFeatherVal">14px</span></label>
+          <input type="range" id="bgFeatherSlider" min="2" max="30" value="14">
+        </div>
       </div>
 
-      <div class="control-group">
-        <label>Format de Grille</label>
-        <select id="gridPresetSelect">
-          <option value="5x2" selected>5 colonnes × 2 lignes (Standard)</option>
-          <option value="2x5">2 colonnes × 5 lignes</option>
-        </select>
+      <!-- RÉGLAGE DU CERCLE INDIVIDUEL -->
+      <div class="section-box" style="border-color: rgba(0, 240, 255, 0.3);">
+        <div class="section-title">
+          <span>🎯 Cercle Sélectionné</span>
+          <span class="badge" id="selectedTierBadge">Palier 1 (0)</span>
+        </div>
+
+        <div class="tier-pills" id="tierPills">
+          <!-- 10 boutons P1 à P10 générés dynamiquement -->
+        </div>
+
+        <div class="control-group">
+          <label>Décalage X <span id="indivOffsetXVal">0px</span></label>
+          <input type="range" id="indivOffsetXSlider" min="-120" max="120" value="0">
+        </div>
+
+        <div class="control-group">
+          <label>Décalage Y <span id="indivOffsetYVal">0px</span></label>
+          <input type="range" id="indivOffsetYSlider" min="-120" max="120" value="0">
+        </div>
+
+        <div class="control-group">
+          <label>Rayon de ce cercle <span id="indivRadiusVal">85%</span></label>
+          <input type="range" id="indivRadiusSlider" min="20" max="160" value="85">
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+          <button id="autoFitSingleBtn" class="btn btn-secondary" style="flex: 1; font-size: 0.72rem; padding: 0.4rem;">
+            🪄 Auto ce cercle
+          </button>
+          <button id="resetSingleBtn" class="btn btn-secondary" style="flex: 1; font-size: 0.72rem; padding: 0.4rem;">
+            🔄 Réinitialiser
+          </button>
+        </div>
       </div>
 
-      <div class="control-group">
-        <label>Taille des Cercles <span id="radiusVal">85%</span></label>
-        <input type="range" id="radiusSlider" min="40" max="100" value="85">
-      </div>
+      <!-- RÉGLAGES GLOBAUX DE GRILLE -->
+      <details class="section-box" style="cursor: pointer;">
+        <summary class="section-title" style="cursor: pointer;">⚙️ Réglages Globaux de Grille</summary>
+        <div style="display: flex; flex-direction: column; gap: 0.65rem; margin-top: 0.5rem;">
+          <div class="control-group">
+            <label>Taille Globale <span id="radiusVal">85%</span></label>
+            <input type="range" id="radiusSlider" min="40" max="110" value="85">
+          </div>
 
-      <div class="control-group">
-        <label>Marge Horizontale <span id="marginXVal">0px</span></label>
-        <input type="range" id="marginXSlider" min="-100" max="100" value="0">
-      </div>
+          <div class="control-group">
+            <label>Marge Horizontale <span id="marginXVal">0px</span></label>
+            <input type="range" id="marginXSlider" min="-120" max="120" value="0">
+          </div>
 
-      <div class="control-group">
-        <label>Marge Verticale <span id="marginYVal">0px</span></label>
-        <input type="range" id="marginYSlider" min="-100" max="100" value="0">
-      </div>
+          <div class="control-group">
+            <label>Marge Verticale <span id="marginYVal">0px</span></label>
+            <input type="range" id="marginYSlider" min="-120" max="120" value="0">
+          </div>
 
-      <div class="control-group">
-        <label>Espacement X <span id="spacingXVal">0px</span></label>
-        <input type="range" id="spacingXSlider" min="-50" max="50" value="0">
-      </div>
+          <div class="control-group">
+            <label>Espacement X <span id="spacingXVal">0px</span></label>
+            <input type="range" id="spacingXSlider" min="-80" max="80" value="0">
+          </div>
 
-      <div class="control-group">
-        <label>Espacement Y <span id="spacingYVal">0px</span></label>
-        <input type="range" id="spacingYSlider" min="-50" max="50" value="0">
-      </div>
+          <div class="control-group">
+            <label>Espacement Y <span id="spacingYVal">0px</span></label>
+            <input type="range" id="spacingYSlider" min="-80" max="80" value="0">
+          </div>
 
-      <div class="control-group">
-        <label>Suppression Fond Noir</label>
-        <select id="removeBgSelect">
-          <option value="circle-mask" selected>Masque Circulaire Strict (Recommandé)</option>
-          <option value="chroma-black">Détourage Noir (Chroma-Key)</option>
-          <option value="none">Aucun (Garder fond d'origine)</option>
-        </select>
-      </div>
+          <button id="resetAllBtn" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.4rem;">
+            🔄 Réaligner tous les cercles sur la grille
+          </button>
+        </div>
+      </details>
     </div>
 
     <!-- CENTRE : VISUALISATION EN DIRECT DE LA GRILLE -->
     <div class="panel" style="padding: 1rem;">
-      <div class="panel-title" style="justify-content: space-between;">
-        <span>2. Aperçu du Positionnement (10 Paliers)</span>
-        <span style="font-size: 0.75rem; color: #94a3b8; font-weight: normal;">Déplacez les curseurs si besoin pour aligner les 10 cercles</span>
+      <div class="panel-title">
+        <span>2. Aperçu Interactif</span>
+        <span style="font-size: 0.75rem; color: #94a3b8; font-weight: normal;">
+          🖱️ <strong>Glissez</strong> un cercle pour le déplacer &nbsp;|&nbsp; 🔄 <strong>Molette</strong> pour redimensionner
+        </span>
       </div>
       <div class="preview-canvas-container">
         <canvas id="sourceCanvas"></canvas>
+        <div class="canvas-hud">
+          <span>Cercle actif : <strong id="hudActive">Palier 1</strong></span>
+          <span>Position : <strong id="hudPos">-</strong></span>
+          <span>Rayon : <strong id="hudRadius">-</strong></span>
+        </div>
       </div>
     </div>
 
@@ -297,7 +497,14 @@
         Télécharger les 10 fichiers PNG
       </button>
 
-      <div class="panel-title" style="margin-top: 0.5rem;">Paliers Découpés</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.4rem;">
+        <span class="panel-title" style="margin: 0; border: none; padding: 0;">Paliers Découpés</span>
+        <div style="display: flex; gap: 4px;">
+          <button id="bgPreviewChecker" class="tier-pill active" style="padding: 2px 6px; font-size: 0.65rem;" title="Aperçu Damier Transparent">🏁 Damier</button>
+          <button id="bgPreviewDark" class="tier-pill" style="padding: 2px 6px; font-size: 0.65rem;" title="Aperçu Fond Sombre Jeu">⬛ Jeu</button>
+          <button id="bgPreviewColor" class="tier-pill" style="padding: 2px 6px; font-size: 0.65rem;" title="Aperçu Fond Couleur">🟪 Néon</button>
+        </div>
+      </div>
       <div class="tiers-grid" id="tiersGrid"></div>
 
       <div class="panel-title" style="margin-top: 0.5rem;">Code pour themeRegistry.ts</div>
@@ -316,8 +523,9 @@
     const fileInput = document.getElementById('fileInput');
     const tiersGrid = document.getElementById('tiersGrid');
     const codeBox = document.getElementById('codeBox');
+    const tierPillsContainer = document.getElementById('tierPills');
 
-    // Contrôles
+    // Contrôles globaux
     const themeIdInput = document.getElementById('themeIdInput');
     const gridPresetSelect = document.getElementById('gridPresetSelect');
     const radiusSlider = document.getElementById('radiusSlider');
@@ -326,6 +534,15 @@
     const spacingXSlider = document.getElementById('spacingXSlider');
     const spacingYSlider = document.getElementById('spacingYSlider');
     const removeBgSelect = document.getElementById('removeBgSelect');
+    const bgToleranceSlider = document.getElementById('bgToleranceSlider');
+    const bgFeatherSlider = document.getElementById('bgFeatherSlider');
+    const bgToleranceVal = document.getElementById('bgToleranceVal');
+    const bgFeatherVal = document.getElementById('bgFeatherVal');
+    const bgToleranceGroup = document.getElementById('bgToleranceGroup');
+    const bgFeatherGroup = document.getElementById('bgFeatherGroup');
+    const bgPreviewChecker = document.getElementById('bgPreviewChecker');
+    const bgPreviewDark = document.getElementById('bgPreviewDark');
+    const bgPreviewColor = document.getElementById('bgPreviewColor');
 
     const radiusVal = document.getElementById('radiusVal');
     const marginXVal = document.getElementById('marginXVal');
@@ -333,28 +550,210 @@
     const spacingXVal = document.getElementById('spacingXVal');
     const spacingYVal = document.getElementById('spacingYVal');
 
+    // Contrôles individuels
+    const selectedTierBadge = document.getElementById('selectedTierBadge');
+    const indivOffsetXSlider = document.getElementById('indivOffsetXSlider');
+    const indivOffsetYSlider = document.getElementById('indivOffsetYSlider');
+    const indivRadiusSlider = document.getElementById('indivRadiusSlider');
+    const indivOffsetXVal = document.getElementById('indivOffsetXVal');
+    const indivOffsetYVal = document.getElementById('indivOffsetYVal');
+    const indivRadiusVal = document.getElementById('indivRadiusVal');
+    const autoFitBtn = document.getElementById('autoFitBtn');
+    const autoFitSingleBtn = document.getElementById('autoFitSingleBtn');
+    const resetSingleBtn = document.getElementById('resetSingleBtn');
+    const resetAllBtn = document.getElementById('resetAllBtn');
+
+    // HUD
+    const hudActive = document.getElementById('hudActive');
+    const hudPos = document.getElementById('hudPos');
+    const hudRadius = document.getElementById('hudRadius');
+
+    // Index du cercle sélectionné (0 à 9)
+    let selectedCircleIndex = 0;
+
+    // État individuel pour chaque cercle :
+    // cx, cy, r sont les coordonnées absolues dans l'image source.
+    // custom est mis à true si l'utilisateur ou l'auto-ajustement a personnalisé ce cercle.
+    let circles = Array.from({ length: 10 }, () => ({
+      cx: 0,
+      cy: 0,
+      r: 50,
+      custom: false
+    }));
+
     // 10 Canvas pour les 10 tiers (256x256 chacun)
-    const tierCanvases = Array.from({ length: 10 }, (_, i) => {
+    const tierCanvases = Array.from({ length: 10 }, () => {
       const c = document.createElement('canvas');
       c.width = 256;
       c.height = 256;
       return c;
     });
 
-    // Initialiser les miniatures
+    // Générer les pilules de sélection 0..9
+    function initPills() {
+      tierPillsContainer.innerHTML = '';
+      for (let i = 0; i < 10; i++) {
+        const pill = document.createElement('div');
+        pill.className = `tier-pill ${i === selectedCircleIndex ? 'active' : ''}`;
+        pill.innerText = `P${i + 1}`;
+        pill.title = `Palier ${i + 1} (tier_${i}.png)`;
+        pill.addEventListener('click', () => selectCircle(i));
+        tierPillsContainer.appendChild(pill);
+      }
+    }
+
+    // Initialiser les miniatures de droite
     function initTierGrid() {
       tiersGrid.innerHTML = '';
       tierCanvases.forEach((c, idx) => {
         const card = document.createElement('div');
-        card.className = 'tier-card';
+        card.className = `tier-card ${idx === selectedCircleIndex ? 'active' : ''}`;
+        card.id = `tier-card-${idx}`;
         card.appendChild(c);
         const label = document.createElement('span');
-        label.innerText = `tier_${idx}.png (Palier ${idx + 1})`;
+        label.innerText = `tier_${idx}.png (P${idx + 1})`;
         card.appendChild(label);
+        card.addEventListener('click', () => selectCircle(idx));
         tiersGrid.appendChild(card);
       });
     }
+    initPills();
     initTierGrid();
+
+    function setPreviewBg(mode) {
+      bgPreviewChecker.classList.toggle('active', mode === 'checker');
+      bgPreviewDark.classList.toggle('active', mode === 'dark');
+      bgPreviewColor.classList.toggle('active', mode === 'color');
+      tierCanvases.forEach(c => {
+        c.className = (mode === 'dark' ? 'bg-dark' : mode === 'color' ? 'bg-color' : '');
+      });
+    }
+    bgPreviewChecker.addEventListener('click', () => setPreviewBg('checker'));
+    bgPreviewDark.addEventListener('click', () => setPreviewBg('dark'));
+    bgPreviewColor.addEventListener('click', () => setPreviewBg('color'));
+
+    function selectCircle(idx) {
+      selectedCircleIndex = Math.max(0, Math.min(9, idx));
+      
+      // Mettre à jour les styles actifs
+      document.querySelectorAll('.tier-pill').forEach((p, i) => {
+        p.classList.toggle('active', i === selectedCircleIndex);
+      });
+      document.querySelectorAll('.tier-card').forEach((c, i) => {
+        c.classList.toggle('active', i === selectedCircleIndex);
+      });
+
+      selectedTierBadge.innerText = `Palier ${selectedCircleIndex + 1} (P${selectedCircleIndex + 1})`;
+      hudActive.innerText = `Palier ${selectedCircleIndex + 1}`;
+
+      updateIndivSlidersFromState();
+      render();
+    }
+
+    // Calcul de la position par défaut selon la grille globale
+    function getGridDefaultCircle(i) {
+      if (!sourceImage) return { cx: 0, cy: 0, r: 50 };
+      const w = sourceCanvas.width;
+      const h = sourceCanvas.height;
+
+      const is5x2 = gridPresetSelect.value === '5x2';
+      const cols = is5x2 ? 5 : 2;
+      const rows = is5x2 ? 2 : 5;
+
+      const cellW = w / cols;
+      const cellH = h / rows;
+
+      const userRadiusPercent = parseInt(radiusSlider.value, 10) / 100;
+      const baseR = (Math.min(cellW, cellH) * 0.5) * userRadiusPercent;
+
+      const offsetX = parseInt(marginXSlider.value, 10);
+      const offsetY = parseInt(marginYSlider.value, 10);
+      const spaceX = parseInt(spacingXSlider.value, 10);
+      const spaceY = parseInt(spacingYSlider.value, 10);
+
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+
+      const cx = (col + 0.5) * cellW + offsetX + (col - (cols - 1) / 2) * spaceX;
+      const cy = (row + 0.5) * cellH + offsetY + (row - (rows - 1) / 2) * spaceY;
+
+      return { cx, cy, r: baseR };
+    }
+
+    function recomputeCirclesFromGrid(forceResetAll = false) {
+      for (let i = 0; i < 10; i++) {
+        if (forceResetAll || !circles[i].custom) {
+          const def = getGridDefaultCircle(i);
+          circles[i].cx = def.cx;
+          circles[i].cy = def.cy;
+          circles[i].r = def.r;
+          if (forceResetAll) circles[i].custom = false;
+        }
+      }
+      updateIndivSlidersFromState();
+    }
+
+    function updateIndivSlidersFromState() {
+      if (!sourceImage) return;
+      const cur = circles[selectedCircleIndex];
+      const def = getGridDefaultCircle(selectedCircleIndex);
+
+      const deltaX = Math.round(cur.cx - def.cx);
+      const deltaY = Math.round(cur.cy - def.cy);
+      const rRatio = Math.round((cur.r / def.r) * parseInt(radiusSlider.value, 10));
+
+      indivOffsetXSlider.value = Math.max(-120, Math.min(120, deltaX));
+      indivOffsetYSlider.value = Math.max(-120, Math.min(120, deltaY));
+      indivRadiusSlider.value = Math.max(20, Math.min(160, rRatio));
+
+      indivOffsetXVal.innerText = `${deltaX >= 0 ? '+' : ''}${deltaX}px`;
+      indivOffsetYVal.innerText = `${deltaY >= 0 ? '+' : ''}${deltaY}px`;
+      indivRadiusVal.innerText = `${rRatio}%`;
+
+      hudPos.innerText = `X:${Math.round(cur.cx)}, Y:${Math.round(cur.cy)}`;
+      hudRadius.innerText = `${Math.round(cur.r)}px`;
+    }
+
+    // Gestion de l'input sur les sliders individuels
+    function onIndivSlidersChange() {
+      if (!sourceImage) return;
+      const def = getGridDefaultCircle(selectedCircleIndex);
+      const cur = circles[selectedCircleIndex];
+
+      const dx = parseInt(indivOffsetXSlider.value, 10);
+      const dy = parseInt(indivOffsetYSlider.value, 10);
+      const rRatio = parseInt(indivRadiusSlider.value, 10) / parseInt(radiusSlider.value, 10);
+
+      cur.cx = def.cx + dx;
+      cur.cy = def.cy + dy;
+      cur.r = Math.max(10, def.r * rRatio);
+      cur.custom = true;
+
+      indivOffsetXVal.innerText = `${dx >= 0 ? '+' : ''}${dx}px`;
+      indivOffsetYVal.innerText = `${dy >= 0 ? '+' : ''}${dy}px`;
+      indivRadiusVal.innerText = `${indivRadiusSlider.value}%`;
+
+      hudPos.innerText = `X:${Math.round(cur.cx)}, Y:${Math.round(cur.cy)}`;
+      hudRadius.innerText = `${Math.round(cur.r)}px`;
+
+      render();
+    }
+
+    indivOffsetXSlider.addEventListener('input', onIndivSlidersChange);
+    indivOffsetYSlider.addEventListener('input', onIndivSlidersChange);
+    indivRadiusSlider.addEventListener('input', onIndivSlidersChange);
+
+    resetSingleBtn.addEventListener('click', () => {
+      const def = getGridDefaultCircle(selectedCircleIndex);
+      circles[selectedCircleIndex] = { ...def, custom: false };
+      updateIndivSlidersFromState();
+      render();
+    });
+
+    resetAllBtn.addEventListener('click', () => {
+      recomputeCirclesFromGrid(true);
+      render();
+    });
 
     // Glisser-déposer & Fichiers
     dropzone.addEventListener('click', () => fileInput.click());
@@ -389,6 +788,7 @@
           sourceImage = img;
           sourceCanvas.width = img.naturalWidth;
           sourceCanvas.height = img.naturalHeight;
+          recomputeCirclesFromGrid(true);
           render();
         };
         img.src = event.target.result;
@@ -396,22 +796,427 @@
       reader.readAsDataURL(file);
     }
 
-    // Mise à jour des valeurs des curseurs
+    // Mise à jour des valeurs des curseurs globaux
     function updateLabels() {
       radiusVal.innerText = `${radiusSlider.value}%`;
       marginXVal.innerText = `${marginXSlider.value}px`;
       marginYVal.innerText = `${marginYSlider.value}px`;
       spacingXVal.innerText = `${spacingXSlider.value}px`;
       spacingYVal.innerText = `${spacingYSlider.value}px`;
-    }
+      if (bgToleranceVal && bgToleranceSlider) bgToleranceVal.innerText = bgToleranceSlider.value;
+      if (bgFeatherVal && bgFeatherSlider) bgFeatherVal.innerText = `${bgFeatherSlider.value}px`;
 
-    [radiusSlider, marginXSlider, marginYSlider, spacingXSlider, spacingYSlider, gridPresetSelect, removeBgSelect, themeIdInput].forEach(ctrl => {
+      const mode = removeBgSelect.value;
+      const showSliders = (mode === 'smart-black' || mode === 'chroma-black' || mode === 'smart-white');
+      if (bgToleranceGroup) bgToleranceGroup.style.display = showSliders ? 'flex' : 'none';
+      if (bgFeatherGroup) bgFeatherGroup.style.display = showSliders ? 'flex' : 'none';
+    }
+    updateLabels();
+
+    // Contrôles qui affectent la géométrie de la grille
+    [radiusSlider, marginXSlider, marginYSlider, spacingXSlider, spacingYSlider, gridPresetSelect].forEach(ctrl => {
+      ctrl.addEventListener('input', () => {
+        updateLabels();
+        recomputeCirclesFromGrid(false);
+        render();
+      });
+    });
+
+    // Contrôles qui affectent le détourage ou le texte
+    [removeBgSelect, bgToleranceSlider, bgFeatherSlider, themeIdInput].forEach(ctrl => {
       ctrl.addEventListener('input', () => {
         updateLabels();
         render();
       });
     });
 
+    // ==========================================
+    // ALGORITHME D'AUTO-AJUSTEMENT INTELLIGENT
+    // ==========================================
+    function autoFitCircleIndex(idx) {
+      if (!sourceImage) return;
+
+      const w = sourceCanvas.width;
+      const h = sourceCanvas.height;
+      const is5x2 = gridPresetSelect.value === '5x2';
+      const cols = is5x2 ? 5 : 2;
+      const rows = is5x2 ? 2 : 5;
+
+      const cellW = w / cols;
+      const cellH = h / rows;
+
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+
+      // Découper temporairement la cellule
+      const cellX = Math.floor(col * cellW);
+      const cellY = Math.floor(row * cellH);
+      const cellWidth = Math.floor(cellW);
+      const cellHeight = Math.floor(cellH);
+
+      // Créer un canvas hors-écran pour analyser les pixels bruts
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = cellWidth;
+      offCanvas.height = cellHeight;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.drawImage(sourceImage, cellX, cellY, cellWidth, cellHeight, 0, 0, cellWidth, cellHeight);
+
+      const imgData = offCtx.getImageData(0, 0, cellWidth, cellHeight);
+      const d = imgData.data;
+
+      // 1. Échantillonner la couleur du fond (bords et coins de la cellule)
+      let bgR = 0, bgG = 0, bgB = 0, bgCount = 0;
+      const sampleMargin = Math.min(20, Math.floor(Math.min(cellWidth, cellHeight) * 0.08));
+
+      for (let y = 0; y < cellHeight; y += 2) {
+        for (let x = 0; x < cellWidth; x += 2) {
+          const isBorder = (x < sampleMargin || x >= cellWidth - sampleMargin || y < sampleMargin || y >= cellHeight - sampleMargin);
+          if (isBorder) {
+            const p = (y * cellWidth + x) * 4;
+            bgR += d[p];
+            bgG += d[p + 1];
+            bgB += d[p + 2];
+            bgCount++;
+          }
+        }
+      }
+      if (bgCount > 0) {
+        bgR /= bgCount;
+        bgG /= bgCount;
+        bgB /= bgCount;
+      }
+
+      // 2. Trouver tous les pixels du sujet (qui diffèrent significativement du fond)
+      let sumX = 0, sumY = 0, totalWeight = 0;
+      const foregroundPixels = [];
+      const threshold = 32; // Seuil de distance colorimétrique
+
+      for (let y = 4; y < cellHeight - 4; y += 2) {
+        for (let x = 4; x < cellWidth - 4; x += 2) {
+          const p = (y * cellWidth + x) * 4;
+          const r = d[p];
+          const g = d[p + 1];
+          const b = d[p + 2];
+          const a = d[p + 3];
+
+          if (a < 30) continue;
+
+          // Distance Euclidienne de couleur avec le fond
+          const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
+          if (dist > threshold) {
+            const weight = Math.min(2, dist / 40);
+            sumX += x * weight;
+            sumY += y * weight;
+            totalWeight += weight;
+            foregroundPixels.push({ x, y, dist });
+          }
+        }
+      }
+
+      // Si aucun sujet net n'est détecté, on garde la position de grille par défaut
+      if (totalWeight < 50 || foregroundPixels.length < 50) {
+        const def = getGridDefaultCircle(idx);
+        circles[idx].cx = def.cx;
+        circles[idx].cy = def.cy;
+        circles[idx].r = def.r;
+        circles[idx].custom = true;
+        return;
+      }
+
+      // 3. Calculer le centre de masse (barycentre)
+      const localCenterX = sumX / totalWeight;
+      const localCenterY = sumY / totalWeight;
+
+      // 4. Calculer le rayon optimal englobant (98ème percentile des distances pour ignorer le bruit/artefacts)
+      const distances = foregroundPixels.map(p => Math.hypot(p.x - localCenterX, p.y - localCenterY));
+      distances.sort((a, b) => a - b);
+      const p98Index = Math.min(distances.length - 1, Math.floor(distances.length * 0.985));
+      const objectRadius = distances[p98Index];
+
+      // Marge de respiration de 6% pour une découpe parfaite
+      const paddingFactor = 1.06;
+      let optimalR = objectRadius * paddingFactor;
+
+      // Limiter le rayon pour ne pas dépasser de la case
+      const maxAllowedR = Math.min(cellWidth, cellHeight) * 0.49;
+      const minAllowedR = Math.min(cellWidth, cellHeight) * 0.15;
+      optimalR = Math.max(minAllowedR, Math.min(maxAllowedR, optimalR));
+
+      // Mettre à jour le cercle
+      circles[idx].cx = cellX + localCenterX;
+      circles[idx].cy = cellY + localCenterY;
+      circles[idx].r = optimalR;
+      circles[idx].custom = true;
+    }
+
+    function autoFitAllCircles() {
+      if (!sourceImage) {
+        alert("Veuillez d'abord glisser ou sélectionner une image !");
+        return;
+      }
+      for (let i = 0; i < 10; i++) {
+        autoFitCircleIndex(i);
+      }
+      updateIndivSlidersFromState();
+      render();
+    }
+
+    autoFitBtn.addEventListener('click', autoFitAllCircles);
+    autoFitSingleBtn.addEventListener('click', () => {
+      autoFitCircleIndex(selectedCircleIndex);
+      updateIndivSlidersFromState();
+      render();
+    });
+
+    // ==========================================
+    // INTERACTION DIRECTE SOURIS / TOUCH SUR LE CANVAS
+    // ==========================================
+    let isDragging = false;
+    let dragCircleIndex = -1;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let circleStartCx = 0;
+    let circleStartCy = 0;
+
+    function getCanvasCoords(evt) {
+      const rect = sourceCanvas.getBoundingClientRect();
+      const scaleX = sourceCanvas.width / rect.width;
+      const scaleY = sourceCanvas.height / rect.height;
+      return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+      };
+    }
+
+    sourceCanvas.addEventListener('pointerdown', (e) => {
+      if (!sourceImage) return;
+      const { x, y } = getCanvasCoords(e);
+
+      // Trouver si on a cliqué sur un cercle (en testant d'abord le cercle actif puis les autres)
+      let foundIndex = -1;
+      const testOrder = [selectedCircleIndex, ...Array.from({length: 10}, (_, i) => i).filter(i => i !== selectedCircleIndex)];
+      
+      for (const i of testOrder) {
+        const c = circles[i];
+        const dist = Math.hypot(x - c.cx, y - c.cy);
+        if (dist <= c.r * 1.08) {
+          foundIndex = i;
+          break;
+        }
+      }
+
+      if (foundIndex !== -1) {
+        selectCircle(foundIndex);
+        isDragging = true;
+        dragCircleIndex = foundIndex;
+        dragStartX = x;
+        dragStartY = y;
+        circleStartCx = circles[foundIndex].cx;
+        circleStartCy = circles[foundIndex].cy;
+        sourceCanvas.setPointerCapture(e.pointerId);
+      }
+    });
+
+    sourceCanvas.addEventListener('pointermove', (e) => {
+      if (!sourceImage) return;
+      const { x, y } = getCanvasCoords(e);
+
+      if (isDragging && dragCircleIndex !== -1) {
+        const dx = x - dragStartX;
+        const dy = y - dragStartY;
+        circles[dragCircleIndex].cx = circleStartCx + dx;
+        circles[dragCircleIndex].cy = circleStartCy + dy;
+        circles[dragCircleIndex].custom = true;
+        updateIndivSlidersFromState();
+        render();
+      } else {
+        // Changement du curseur au survol
+        let hovered = false;
+        for (let i = 0; i < 10; i++) {
+          const c = circles[i];
+          if (Math.hypot(x - c.cx, y - c.cy) <= c.r * 1.08) {
+            hovered = true;
+            break;
+          }
+        }
+        sourceCanvas.style.cursor = hovered ? 'grab' : 'crosshair';
+      }
+    });
+
+    function endDrag(e) {
+      if (isDragging) {
+        isDragging = false;
+        dragCircleIndex = -1;
+        try { sourceCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    }
+    sourceCanvas.addEventListener('pointerup', endDrag);
+    sourceCanvas.addEventListener('pointercancel', endDrag);
+
+    // Molette de souris sur le canvas pour redimensionner le cercle survolé / sélectionné
+    sourceCanvas.addEventListener('wheel', (e) => {
+      if (!sourceImage) return;
+      e.preventDefault();
+      const { x, y } = getCanvasCoords(e);
+
+      // Trouver le cercle sous la souris ou le cercle sélectionné
+      let targetIdx = selectedCircleIndex;
+      for (let i = 0; i < 10; i++) {
+        const c = circles[i];
+        if (Math.hypot(x - c.cx, y - c.cy) <= c.r * 1.1) {
+          targetIdx = i;
+          break;
+        }
+      }
+
+      if (targetIdx !== selectedCircleIndex) {
+        selectCircle(targetIdx);
+      }
+
+      const factor = e.deltaY < 0 ? 1.04 : 0.96;
+      circles[targetIdx].r = Math.max(15, Math.min(sourceCanvas.width * 0.4, circles[targetIdx].r * factor));
+      circles[targetIdx].custom = true;
+
+      updateIndivSlidersFromState();
+      render();
+    }, { passive: false });
+
+    // ==========================================
+    // ALGORITHME DE DÉTOURAGE INTELLIGENT DU FOND (FLOOD-FILL & DE-FRINGING)
+    // ==========================================
+    function applyBackgroundRemoval(tCtx, mode, threshold, feather) {
+      if (mode === 'none') return;
+
+      const w = 256;
+      const h = 256;
+      const imgData = tCtx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+
+      // 1. Découpage circulaire doux à la limite maximale (r > 124 = transparent)
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const dist = Math.hypot(x - 128, y - 128);
+          if (dist > 124) {
+            data[(y * w + x) * 4 + 3] = 0;
+          }
+        }
+      }
+
+      if (mode === 'circle-mask') {
+        tCtx.putImageData(imgData, 0, 0);
+        return;
+      }
+
+      const isWhiteMode = (mode === 'smart-white');
+      const isFloodFill = (mode === 'smart-black' || mode === 'smart-white');
+
+      function getBgDist(pIdx) {
+        const r = data[pIdx];
+        const g = data[pIdx + 1];
+        const b = data[pIdx + 2];
+        if (isWhiteMode) {
+          return Math.sqrt((255 - r) ** 2 + (255 - g) ** 2 + (255 - b) ** 2);
+        }
+        return Math.sqrt(r * r + g * g + b * b);
+      }
+
+      if (!isFloodFill) {
+        // Chroma-Key global direct
+        for (let p = 0; p < data.length; p += 4) {
+          if (data[p + 3] === 0) continue;
+          const dist = getBgDist(p);
+          if (dist <= threshold) {
+            data[p + 3] = 0;
+          } else if (dist <= threshold + feather) {
+            const ratio = (dist - threshold) / feather;
+            data[p + 3] = Math.round(ratio * 255);
+          }
+        }
+        tCtx.putImageData(imgData, 0, 0);
+        return;
+      }
+
+      // Flood-Fill intelligent depuis les 4 bords pour ne JAMAIS supprimer les yeux/détails internes
+      const visited = new Uint8Array(w * h);
+      const isBackground = new Uint8Array(w * h);
+      const queue = new Int32Array(w * h);
+      let qHead = 0, qTail = 0;
+
+      // Ensemencement depuis les 4 bordures extérieures
+      for (let x = 0; x < w; x++) {
+        const topIdx = x;
+        const botIdx = (h - 1) * w + x;
+        visited[topIdx] = 1; visited[botIdx] = 1;
+        queue[qTail++] = topIdx; queue[qTail++] = botIdx;
+      }
+      for (let y = 1; y < h - 1; y++) {
+        const leftIdx = y * w;
+        const rightIdx = y * w + (w - 1);
+        visited[leftIdx] = 1; visited[rightIdx] = 1;
+        queue[qTail++] = leftIdx; queue[qTail++] = rightIdx;
+      }
+
+      const maxDist = threshold;
+      const maxFeatherDist = threshold + feather;
+
+      while (qHead < qTail) {
+        const curr = queue[qHead++];
+        const px = curr % w;
+        const py = Math.floor(curr / w);
+        const pIdx = curr * 4;
+
+        const dist = getBgDist(pIdx);
+
+        if (dist <= maxFeatherDist) {
+          isBackground[curr] = 1;
+
+          const neighbors = [
+            py > 0 ? curr - w : -1,
+            py < h - 1 ? curr + w : -1,
+            px > 0 ? curr - 1 : -1,
+            px < w - 1 ? curr + 1 : -1
+          ];
+
+          for (let n of neighbors) {
+            if (n >= 0 && !visited[n]) {
+              visited[n] = 1;
+              queue[qTail++] = n;
+            }
+          }
+        }
+      }
+
+      // Application de la transparence et dé-fringing des bords
+      for (let i = 0; i < w * h; i++) {
+        const pIdx = i * 4;
+        if (data[pIdx + 3] === 0) continue;
+
+        if (isBackground[i]) {
+          const dist = getBgDist(pIdx);
+          if (dist <= maxDist) {
+            data[pIdx + 3] = 0; // 100% transparent
+          } else {
+            const ratio = (dist - maxDist) / feather;
+            const newAlpha = Math.round(Math.min(255, Math.max(0, ratio * 255)));
+            data[pIdx + 3] = Math.min(data[pIdx + 3], newAlpha);
+
+            // Dé-fringing noir (rehaussement des contours pour éliminer les halos sombres)
+            if (!isWhiteMode && ratio > 0.05 && ratio < 0.98) {
+              const boost = 1 / Math.max(0.28, ratio);
+              data[pIdx] = Math.min(255, Math.round(data[pIdx] * (0.6 * boost + 0.4)));
+              data[pIdx + 1] = Math.min(255, Math.round(data[pIdx + 1] * (0.6 * boost + 0.4)));
+              data[pIdx + 2] = Math.min(255, Math.round(data[pIdx + 2] * (0.6 * boost + 0.4)));
+            }
+          }
+        }
+      }
+
+      tCtx.putImageData(imgData, 0, 0);
+    }
+
+    // ==========================================
+    // RENDU & DÉCOUPE
+    // ==========================================
     function render() {
       if (!sourceImage) return;
 
@@ -422,88 +1227,69 @@
       sourceCtx.clearRect(0, 0, w, h);
       sourceCtx.drawImage(sourceImage, 0, 0);
 
-      // Calcul des 10 positions
-      const is5x2 = gridPresetSelect.value === '5x2';
-      const cols = is5x2 ? 5 : 2;
-      const rows = is5x2 ? 2 : 5;
-
-      const cellW = w / cols;
-      const cellH = h / rows;
-
-      const userRadiusPercent = parseInt(radiusSlider.value, 10) / 100;
-      const baseR = (Math.min(cellW, cellH) * 0.5) * userRadiusPercent;
-
-      const offsetX = parseInt(marginXSlider.value, 10);
-      const offsetY = parseInt(marginYSlider.value, 10);
-      const spaceX = parseInt(spacingXSlider.value, 10);
-      const spaceY = parseInt(spacingYSlider.value, 10);
-
       const removeBgMode = removeBgSelect.value;
 
       for (let i = 0; i < 10; i++) {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-
-        const cx = (col + 0.5) * cellW + offsetX + (col - (cols - 1) / 2) * spaceX;
-        const cy = (row + 0.5) * cellH + offsetY + (row - (rows - 1) / 2) * spaceY;
+        const c = circles[i];
+        const cx = c.cx;
+        const cy = c.cy;
+        const r = c.r;
+        const isSelected = (i === selectedCircleIndex);
 
         // 2. Découper vers le canvas 256x256 dédié
         const tCanvas = tierCanvases[i];
         const tCtx = tCanvas.getContext('2d');
         tCtx.clearRect(0, 0, 256, 256);
 
-        tCtx.save();
-        if (removeBgMode === 'circle-mask') {
-          // Masque circulaire parfait anti-aliasé
-          tCtx.beginPath();
-          tCtx.arc(128, 128, 124, 0, Math.PI * 2);
-          tCtx.clip();
-        }
-
         // Dessiner la portion extraite
         tCtx.drawImage(
           sourceImage,
-          cx - baseR, cy - baseR, baseR * 2, baseR * 2,
+          cx - r, cy - r, r * 2, r * 2,
           4, 4, 248, 248
         );
-        tCtx.restore();
 
-        // Si chroma keying demandé
-        if (removeBgMode === 'chroma-black') {
-          const imgData = tCtx.getImageData(0, 0, 256, 256);
-          const d = imgData.data;
-          for (let p = 0; p < d.length; p += 4) {
-            const distFromCenter = Math.hypot((p/4 % 256) - 128, Math.floor(p/4 / 256) - 128);
-            if (distFromCenter > 124) {
-              d[p + 3] = 0; // cercle strict à l'extérieur
-            } else {
-              const lum = (d[p] + d[p+1] + d[p+2]) / 3;
-              if (lum < 25) {
-                d[p + 3] = Math.max(0, (lum - 10) * 17);
-              }
-            }
-          }
-          tCtx.putImageData(imgData, 0, 0);
-        }
+        // Appliquer le détourage sélectionné
+        const tolerance = parseInt(bgToleranceSlider.value, 10);
+        const feather = parseInt(bgFeatherSlider.value, 10);
+        applyBackgroundRemoval(tCtx, removeBgMode, tolerance, feather);
 
-        // 3. Dessiner la grille de guidage sur le canvas principal
+        // 3. Dessiner le cercle et l'indicateur sur le grand canvas
         sourceCtx.save();
         sourceCtx.beginPath();
-        sourceCtx.arc(cx, cy, baseR, 0, Math.PI * 2);
-        sourceCtx.strokeStyle = '#00f0ff';
-        sourceCtx.lineWidth = Math.max(3, w * 0.003);
-        sourceCtx.shadowColor = '#00f0ff';
-        sourceCtx.shadowBlur = 10;
+        sourceCtx.arc(cx, cy, r, 0, Math.PI * 2);
+
+        if (isSelected) {
+          sourceCtx.strokeStyle = '#ffff00';
+          sourceCtx.lineWidth = Math.max(4, w * 0.0045);
+          sourceCtx.shadowColor = '#ffff00';
+          sourceCtx.shadowBlur = 14;
+        } else {
+          sourceCtx.strokeStyle = '#00f0ff';
+          sourceCtx.lineWidth = Math.max(2.5, w * 0.0025);
+          sourceCtx.shadowColor = '#00f0ff';
+          sourceCtx.shadowBlur = 8;
+        }
         sourceCtx.stroke();
 
-        // Numéro du Tier
-        sourceCtx.fillStyle = '#ff007f';
-        sourceCtx.font = `bold ${Math.max(16, Math.round(baseR * 0.35))}px "JetBrains Mono", sans-serif`;
+        // Réticule central subtil pour le cercle sélectionné
+        if (isSelected) {
+          sourceCtx.beginPath();
+          const cross = Math.max(6, r * 0.15);
+          sourceCtx.moveTo(cx - cross, cy); sourceCtx.lineTo(cx + cross, cy);
+          sourceCtx.moveTo(cx, cy - cross); sourceCtx.lineTo(cx, cy + cross);
+          sourceCtx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+          sourceCtx.lineWidth = 2;
+          sourceCtx.stroke();
+        }
+
+        // Numéro du Tier / Palier
+        sourceCtx.fillStyle = isSelected ? '#ffffff' : '#ff007f';
+        sourceCtx.font = `bold ${Math.max(16, Math.round(r * 0.32))}px "JetBrains Mono", sans-serif`;
         sourceCtx.textAlign = 'center';
         sourceCtx.textBaseline = 'middle';
         sourceCtx.shadowColor = '#000000';
         sourceCtx.shadowBlur = 6;
-        sourceCtx.fillText(`${i}`, cx, cy - baseR * 0.65);
+        sourceCtx.fillText(`P${i + 1}`, cx, cy - r * 0.65);
         sourceCtx.restore();
       }
 

@@ -78,6 +78,27 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     'settings.title': 'Paramètres en Direct',
     'settings.subtitle': 'Mise à jour 60 FPS',
     'settings.reset_all': 'Réinitialiser les paramètres',
+    'settings.presets': 'Presets',
+    'settings.presets_tooltip': 'Importer / Exporter les paramètres (JSON ou texte)',
+    'presets.modal_title': 'Gestion des Presets',
+    'presets.modal_subtitle': 'Sauvegardez, partagez ou restaurez vos réglages personnalisés.',
+    'presets.export_tab': 'Exporter',
+    'presets.import_tab': 'Importer',
+    'presets.saved_tab': 'Mes Presets',
+    'presets.copy_json': 'Copier le JSON',
+    'presets.copied': 'Copié !',
+    'presets.download_json': 'Télécharger le fichier .json',
+    'presets.paste_label': 'Coller le texte JSON ou glisser un fichier :',
+    'presets.apply_btn': 'Appliquer ce Preset',
+    'presets.save_local': 'Sauvegarder dans le navigateur',
+    'presets.preset_name_placeholder': 'Nom du preset (ex: Mon Thème TikTok)',
+    'presets.save_btn': 'Enregistrer',
+    'presets.no_saved': 'Aucun preset enregistré pour ce jeu pour l’instant.',
+    'presets.load_btn': 'Charger',
+    'presets.delete_btn': 'Supprimer',
+    'presets.invalid_json': 'Format JSON invalide. Vérifiez le texte collé.',
+    'presets.success_applied': 'Preset appliqué avec succès !',
+    'presets.close': 'Fermer',
 
     // Tabs
     'tabs.all': 'Tous',
@@ -142,6 +163,27 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     'settings.title': 'Live Settings',
     'settings.subtitle': '60 FPS Real-time update',
     'settings.reset_all': 'Reset settings',
+    'settings.presets': 'Presets',
+    'settings.presets_tooltip': 'Import / Export settings (JSON or text)',
+    'presets.modal_title': 'Preset Manager',
+    'presets.modal_subtitle': 'Save, share or restore your custom game configurations.',
+    'presets.export_tab': 'Export',
+    'presets.import_tab': 'Import',
+    'presets.saved_tab': 'Saved Presets',
+    'presets.copy_json': 'Copy JSON',
+    'presets.copied': 'Copied!',
+    'presets.download_json': 'Download .json file',
+    'presets.paste_label': 'Paste JSON text or drop a file:',
+    'presets.apply_btn': 'Apply this Preset',
+    'presets.save_local': 'Save to browser storage',
+    'presets.preset_name_placeholder': 'Preset name (e.g. My TikTok Theme)',
+    'presets.save_btn': 'Save',
+    'presets.no_saved': 'No saved presets for this game yet.',
+    'presets.load_btn': 'Load',
+    'presets.delete_btn': 'Delete',
+    'presets.invalid_json': 'Invalid JSON format. Please verify the text.',
+    'presets.success_applied': 'Preset successfully applied!',
+    'presets.close': 'Close',
 
     // Tabs
     'tabs.all': 'All',
@@ -253,6 +295,90 @@ export const FIELD_METADATA_TRANSLATIONS: Record<string, Record<Language, { labe
   },
 
   // --- Ball Escape ---
+  GAME_MODE: {
+    fr: { label: 'Mode de Jeu TikTok', description: 'Classique, Multi-Anneaux, Duel 2 Couleurs ou Tempête de Billes.' },
+    en: { label: 'TikTok Game Mode', description: 'Classic, Multi-Rings, 2-Color Duel, or Ball Storm.' }
+  },
+  RING_COUNT: {
+    fr: { label: 'Nombre d’Anneaux Concentriques', description: 'Nombre d’enceintes circulaires à franchir (1 à 6).' },
+    en: { label: 'Concentric Ring Count', description: 'Number of circular rings to escape through (1 to 6).' }
+  },
+  RING_GAP_MODE: {
+    fr: { label: 'Type de Passage des Anneaux', description: 'Briques destructibles à PV ou brèche tournante continue.' },
+    en: { label: 'Ring Passage Mode', description: 'Destructible HP bricks or rotating continuous gap.' }
+  },
+  GAP_SIZE_DEGREES: {
+    fr: { label: 'Largeur de la Brèche Tournante', description: 'Taille de l’ouverture dans l’anneau pour s’échapper.' },
+    en: { label: 'Rotating Gap Width', description: 'Angular opening size in the ring to escape.' }
+  },
+  SEED: {
+    fr: { label: 'Graine Aléatoire (Seed)', description: 'Graine déterministe pour reproduire exactement la même physique.' },
+    en: { label: 'Random Seed', description: 'Deterministic seed to reproduce exact same trajectory.' }
+  },
+  RING_SPACING: {
+    fr: { label: 'Espacement entre Anneaux', description: 'Distance en pixels entre deux anneaux consécutifs.' },
+    en: { label: 'Ring Spacing', description: 'Distance in pixels between consecutive rings.' }
+  },
+  BALL_SKIN: {
+    fr: { label: 'Skin de la Bille', description: 'Néon plasma, boule de feu, planète cosmique, sport, emoji ou rainbow.' },
+    en: { label: 'Ball Skin', description: 'Neon plasma, fireball, cosmic planet, sport, emoji, or rainbow.' }
+  },
+  BALL_TRAIL_STYLE: {
+    fr: { label: 'Style de Traînée', description: 'Ruban néon, flammes, poussière d’étoiles ou arc-en-ciel.' },
+    en: { label: 'Ball Trail Style', description: 'Neon ribbon, fire flames, star dust, or rainbow.' }
+  },
+  ARENA_COLOR: {
+    fr: { label: 'Couleur de l’Arène', description: 'Arc-en-ciel dynamique ou teinte néon fixe.' },
+    en: { label: 'Arena Color', description: 'Dynamic rainbow HP or solid neon glow.' }
+  },
+  ARENA_CENTER_Y: {
+    fr: { label: 'Position Verticale Arène (Safe Zone)', description: 'Ajuste la hauteur de l’arène pour éviter le bandeau TikTok.' },
+    en: { label: 'Arena Vertical Position (Safe Zone)', description: 'Adjust arena height to avoid TikTok bottom description.' }
+  },
+  ARENA_STROKE_WIDTH: {
+    fr: { label: 'Épaisseur Parois Néon', description: 'Épaisseur du tracé néon pour lisibilité mobile.' },
+    en: { label: 'Neon Stroke Width', description: 'Stroke thickness for clear visibility on mobile.' }
+  },
+  SHOW_TOP_HUD: {
+    fr: { label: 'Afficher le HUD Canvas', description: 'Affiche ou masque les textes supérieurs sur la vidéo.' },
+    en: { label: 'Show Top HUD', description: 'Show or hide top HUD texts in the video stream.' }
+  },
+  HUD_TOP_OFFSET: {
+    fr: { label: 'Décalage Bas du HUD', description: 'Descend le texte sous la barre de recherche TikTok.' },
+    en: { label: 'HUD Top Offset', description: 'Lowers HUD below the top TikTok search header.' }
+  },
+  SHOCKWAVE_ENABLED: {
+    fr: { label: 'Cercles d’Impact (Ondes de choc)', description: 'Affiche ou masque les cercles lumineux qui s’étendent après une collision.' },
+    en: { label: 'Impact Shockwave Rings', description: 'Show or hide expanding light rings upon brick or wall collisions.' }
+  },
+  SHOCKWAVE_DURATION: {
+    fr: { label: 'Durée des Cercles d’Impact', description: 'Durée d’apparition et d’estompement des ondes de choc (en secondes).' },
+    en: { label: 'Shockwave Ring Duration', description: 'Lifespan and fade duration of impact shockwave rings (in seconds).' }
+  },
+  PERFECT_LOOP_ENABLED: {
+    fr: { label: 'Boucle Parfaite TikTok (Auto-Loop)', description: 'Redémarre automatiquement 2s après l’évasion pour boucle infinie.' },
+    en: { label: 'TikTok Perfect Loop (Auto-Loop)', description: 'Automatically restarts 2s after escape for endless looping videos.' }
+  },
+  PERFECT_LOOP_DELAY: {
+    fr: { label: 'Délai Avant Redémarrage', description: 'Pause en secondes avant de relancer la partie.' },
+    en: { label: 'Loop Delay', description: 'Pause in seconds before restarting the game.' }
+  },
+  BALL_DUPLICATION_ON_BOUNCE: {
+    fr: { label: 'Dédoublement Bille à Chaque Choc', description: 'Crée une nouvelle bille à chaque collision murale.' },
+    en: { label: 'Duplicate Ball on Bounce', description: 'Spawns extra balls on each wall collision.' }
+  },
+  SOUND_BOUNCE_STYLE: {
+    fr: { label: 'Instrument des Rebonds', description: 'Piano ASMR, Marimba zen, Synth cyber, Bulle pop ou 8-Bit.' },
+    en: { label: 'Bounce Instrument', description: 'ASMR Piano, Zen Marimba, Cyber Synth, Bubble Pop, or 8-Bit.' }
+  },
+  SOUND_MELODY_PRESET: {
+    fr: { label: 'Mélodie Virale TikTok', description: 'Mégalovania, Coffin Dance, Interstellar, Pour Élise, Pirates.' },
+    en: { label: 'TikTok Viral Melody', description: 'Megalovania, Coffin Dance, Interstellar, Fur Elise, Pirates.' }
+  },
+  SOUND_BREAK_STYLE: {
+    fr: { label: 'Style de Destruction', description: 'Crunch croustillant, verre cristallin, laser ou sub boom.' },
+    en: { label: 'Break Sound Style', description: 'Crunchy white noise, crystalline glass, laser or sub boom.' }
+  },
   CHALLENGE_TIME_LIMIT: {
     fr: { label: 'Chronomètre Défi (secondes)', description: 'Durée limite pour que la bille s\'évade.' },
     en: { label: 'Challenge Timer (seconds)', description: 'Time limit for the ball to escape.' }
@@ -273,17 +399,73 @@ export const FIELD_METADATA_TRANSLATIONS: Record<string, Record<Language, { labe
     fr: { label: 'Rayon de l\'arène', description: 'Diamètre intérieur de l\'enceinte.' },
     en: { label: 'Arena Radius', description: 'Inner radius of the circular arena.' }
   },
-  SECONDARY_BALLS_CAN_ESCAPE: {
-    fr: { label: 'Billes bonus peuvent sortir', description: 'Permet aux billes secondaires de s\'échapper.' },
-    en: { label: 'Bonus Balls Can Escape', description: 'Allows secondary balls to exit through gaps.' }
+  MAX_BALLS: {
+    fr: { label: 'Nombre max de billes simultanées', description: 'Plafond de billes actives dans l’arène.' },
+    en: { label: 'Max Active Balls', description: 'Maximum active balls limit in the arena.' }
   },
-  SPAWN_SECONDARY_BALL_ON_BRICK_HIT: {
-    fr: { label: 'Apparition de billes bonus', description: 'Fait apparaître de petites billes aux impacts.' },
-    en: { label: 'Spawn Bonus Balls', description: 'Spawns small extra balls on brick impacts.' }
+  BATTLE_BALL_COUNT: {
+    fr: { label: 'Nombre de billes concurrentes', description: 'Nombre de participants en lice dans le mode Duel / Battle Royale.' },
+    en: { label: 'Battle Participant Count', description: 'Number of competing balls in Duel / Battle Royale mode.' }
   },
-  MAX_SECONDARY_BALLS: {
-    fr: { label: 'Nombre max de billes bonus', description: 'Limite de billes secondaires en jeu.' },
-    en: { label: 'Max Bonus Balls', description: 'Maximum secondary balls in the arena.' }
+  DUEL_P1_COLOR: {
+    fr: { label: 'Couleur Bille 1 (P1)', description: 'Couleur de la première bille en mode Duel.' },
+    en: { label: 'Ball 1 Color (P1)', description: 'Color of the first ball in Duel mode.' }
+  },
+  DUEL_P2_COLOR: {
+    fr: { label: 'Couleur Bille 2 (P2)', description: 'Couleur de la seconde bille en mode Duel.' },
+    en: { label: 'Ball 2 Color (P2)', description: 'Color of the second ball in Duel mode.' }
+  },
+  DUEL_P3_COLOR: {
+    fr: { label: 'Couleur Bille 3 (P3)', description: 'Couleur de la 3e bille en lice.' },
+    en: { label: 'Ball 3 Color (P3)', description: 'Color of the 3rd ball in battle mode.' }
+  },
+  DUEL_P4_COLOR: {
+    fr: { label: 'Couleur Bille 4 (P4)', description: 'Couleur de la 4e bille en lice.' },
+    en: { label: 'Ball 4 Color (P4)', description: 'Color of the 4th ball in battle mode.' }
+  },
+  DUEL_P1_LABEL: {
+    fr: { label: 'Nom Équipe 1 (Duel)', description: 'Nom de la première équipe dans le mode Duel.' },
+    en: { label: 'Team 1 Label (Duel)', description: 'Label for first team in Duel mode.' }
+  },
+  DUEL_P2_LABEL: {
+    fr: { label: 'Nom Équipe 2 (Duel)', description: 'Nom de la seconde équipe dans le mode Duel.' },
+    en: { label: 'Team 2 Label (Duel)', description: 'Label for second team in Duel mode.' }
+  },
+  DUEL_P3_LABEL: {
+    fr: { label: 'Nom Équipe 3 (Combat)', description: 'Nom de la 3e équipe dans le mode Combat.' },
+    en: { label: 'Team 3 Label (Battle)', description: 'Label for 3rd team in battle mode.' }
+  },
+  DUEL_P4_LABEL: {
+    fr: { label: 'Nom Équipe 4 (Combat)', description: 'Nom de la 4e équipe dans le mode Combat.' },
+    en: { label: 'Team 4 Label (Battle)', description: 'Label for 4th team in battle mode.' }
+  },
+  BALL_COLLISION_ENABLED: {
+    fr: { label: 'Collisions entre billes', description: 'Permet aux billes de se percuter et se repousser.' },
+    en: { label: 'Ball-to-Ball Collisions', description: 'Enables elastic bouncing between all active balls.' }
+  },
+  BALL_COLLISION_ELASTICITY: {
+    fr: { label: 'Élasticité chocs inter-billes', description: 'Rebond lors des chocs entre billes.' },
+    en: { label: 'Inter-ball Elasticity', description: 'Restitution coefficient when balls collide.' }
+  },
+  BOUNCE_DIR_RANDOMNESS: {
+    fr: { label: 'Aléatoire direction rebond', description: 'Variation aléatoire de l’angle de rebond par rapport à la réflexion géométrique.' },
+    en: { label: 'Bounce Direction Randomness', description: 'Random deflection applied to the bounce angle.' }
+  },
+  BOUNCE_SPEED_RANDOMNESS: {
+    fr: { label: 'Aléatoire vitesse rebond', description: 'Variation aléatoire de la vitesse de propulsion à chaque rebond.' },
+    en: { label: 'Bounce Speed Randomness', description: 'Random velocity fluctuations applied on each bounce.' }
+  },
+  BOUNCE_RANDOMNESS: {
+    fr: { label: 'Aléatoire des rebonds', description: 'Degré d’imprévisibilité et de variété des trajectoires à chaque rebond.' },
+    en: { label: 'Bounce Randomness', description: 'Degree of unpredictability and variety in trajectories on each bounce.' }
+  },
+  BOUNCE_DEFLECTION: {
+    fr: { label: 'Déviation angulaire (Anti-Boucle 1D)', description: 'Perturbation angulaire organique empêchant les allers-retours monotones.' },
+    en: { label: 'Bounce Deflection (Anti-1D Loop)', description: 'Organic angular perturbation preventing repetitive back-and-forth loops.' }
+  },
+  WALL_SPIN_TRANSFER: {
+    fr: { label: 'Transfert de rotation paroi', description: 'Frottement dynamique transmettant la rotation de l’arène à la bille.' },
+    en: { label: 'Wall Spin Transfer', description: 'Dynamic friction transferring ring spin momentum to the ball.' }
   },
 
   // --- Merge Drop ---
@@ -294,6 +476,14 @@ export const FIELD_METADATA_TRANSLATIONS: Record<string, Record<Language, { labe
   BASE_BALL_RADIUS: {
     fr: { label: 'Taille bille minimum (base)', description: 'Rayon de la plus petite bille (niveau 0). Toutes les autres sphères s\'adaptent proportionnellement.' },
     en: { label: 'Minimum Ball Size (base)', description: 'Base radius of the smallest ball (Tier 0). All other spheres scale proportionally.' }
+  },
+  BALL_HITBOX_SCALE: {
+    fr: { label: 'Taille Hitbox vs Image', description: 'Ajuste la taille de la hitbox ronde de collision par rapport à l’image (ex: 0.85 = hitbox plus petite ; 1.15 = coussin invisible).' },
+    en: { label: 'Hitbox Size vs Image', description: 'Adjusts the round collision hitbox size relative to the ball image (e.g. 0.85 = smaller hitbox; 1.15 = invisible cushion).' }
+  },
+  SHOW_HITBOX_DEBUG: {
+    fr: { label: 'Visualiser la Hitbox Ronde (Debug)', description: 'Trace le cercle physique de collision exact en pointillé vert/cyan pour ajuster visuellement la hitbox par rapport à vos images.' },
+    en: { label: 'Show Round Hitbox (Debug)', description: 'Draws the physics collision circle with dashed green/cyan outline to visually tune hitboxes on your images.' }
   },
   AUTO_STREAM_ACTIVE: {
     fr: { label: 'Lancage Automatique (Niveau 1)', description: 'Lâche des billes niveau 1 en continu dans le tube jusqu’à arrêt.' },
@@ -532,7 +722,9 @@ export const GAME_DEFAULT_TEXTS: Record<string, Record<Language, Record<string, 
       TEXT_STATUS_START: "Clique pour démarrer",
       TEXT_STATUS_ESCAPE: "Évasion réussie !",
       TEXT_STATUS_WIN: "VICTOIRE !",
-      TEXT_STATUS_LOSS: "TEMPS ÉCOULÉ !"
+      TEXT_STATUS_LOSS: "TEMPS ÉCOULÉ !",
+      DUEL_P1_LABEL: "CYAN",
+      DUEL_P2_LABEL: "ROSE"
     },
     en: {
       TEXT_TITLE: "CAN THE BALL ESCAPE IN 30s?",
@@ -541,7 +733,9 @@ export const GAME_DEFAULT_TEXTS: Record<string, Record<Language, Record<string, 
       TEXT_STATUS_START: "Click to start",
       TEXT_STATUS_ESCAPE: "Escape successful!",
       TEXT_STATUS_WIN: "VICTORY!",
-      TEXT_STATUS_LOSS: "TIME'S UP!"
+      TEXT_STATUS_LOSS: "TIME'S UP!",
+      DUEL_P1_LABEL: "CYAN",
+      DUEL_P2_LABEL: "PINK"
     }
   },
   'merge-drop': {

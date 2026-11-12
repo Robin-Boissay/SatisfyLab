@@ -5,13 +5,16 @@ import { GameViewport } from './components/GameViewport';
 import { SettingsPanel } from './components/SettingsPanel';
 import { LeftSettingsPanel } from './components/LeftSettingsPanel';
 import { RightSettingsPanel } from './components/RightSettingsPanel';
+import { PresetModal } from './components/PresetModal';
 import { HubHome } from './components/HubHome';
 import { sound } from './core/SoundEngine';
 import { useVideoRecorder } from './core/useVideoRecorder';
 import { useLanguage, Language } from './core/i18n';
 import { LanguageToggle } from './components/LanguageToggle';
-import { ArrowLeft, Sparkles, SlidersHorizontal, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
+import { ArrowLeft, Sparkles, SlidersHorizontal, PanelLeftOpen, PanelRightOpen, Bookmark, Zap, Square } from 'lucide-react';
 import { CUSTOM_SHAPE_PRESETS, CustomShapePreset } from './games/merge-drop/types';
+import { BatchSimulatorModal } from './components/BatchSimulatorModal';
+import { SimulationTelemetry } from './games/merge-drop/simulation/types';
 
 export const App: React.FC = () => {
   const { language, t, getGameMeta, getDefaultTexts } = useLanguage();
@@ -30,6 +33,25 @@ export const App: React.FC = () => {
   const [hudState, setHudState] = useState<GameHUDState>({});
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState<boolean>(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState<boolean>(false);
+  const [activeReplay, setActiveReplay] = useState<SimulationTelemetry | null>(null);
+
+  const handlePlayReplay = (telemetry: SimulationTelemetry) => {
+    setActiveReplay(telemetry);
+    if (gameInstanceRef.current && (gameInstanceRef.current as any).startReplay) {
+      (gameInstanceRef.current as any).startReplay(telemetry, () => {
+        setActiveReplay(null);
+      });
+    }
+  };
+
+  const handleStopReplay = () => {
+    if (gameInstanceRef.current && (gameInstanceRef.current as any).stopReplay) {
+      (gameInstanceRef.current as any).stopReplay();
+    }
+    setActiveReplay(null);
+  };
 
   // État de réduction des panneaux latéraux (persistant via localStorage)
   const [isLeftCollapsed, setIsLeftCollapsed] = useState<boolean>(() => {
@@ -190,6 +212,20 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleApplyPreset = (importedConfig: Record<string, any>) => {
+    const updated = {
+      ...activeConfig,
+      ...importedConfig
+    };
+    setGameConfigs((prev) => ({
+      ...prev,
+      [activeGameId]: updated
+    }));
+    if (gameInstanceRef.current) {
+      gameInstanceRef.current.updateConfig(updated);
+    }
+  };
+
   const handleResetGame = () => {
     if (gameInstanceRef.current) {
       sound.init();
@@ -211,8 +247,17 @@ export const App: React.FC = () => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
+      if (e.code === 'Escape' && activeReplay) {
+        e.preventDefault();
+        handleStopReplay();
+        return;
+      }
       if (e.code === 'KeyR') {
-        handleResetGame();
+        if (activeReplay) {
+          handleStopReplay();
+        } else {
+          handleResetGame();
+        }
       } else if (e.code === 'KeyM') {
         handleToggleMute();
       } else if (e.code === 'KeyV') {
@@ -232,7 +277,7 @@ export const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeGameId, currentView, toggleRecording]);
+  }, [activeGameId, currentView, toggleRecording, activeReplay]);
 
   // 1. PAGE D'ACCUEIL DU SITE : LE HUB
   if (currentView === 'hub') {
@@ -263,6 +308,7 @@ export const App: React.FC = () => {
         onBackToHub={handleBackToHub}
         onConfigChange={handleConfigChange}
         onResetConfig={handleResetConfig}
+        onOpenPresets={() => setIsPresetModalOpen(true)}
         isCollapsed={isLeftCollapsed}
         onToggleCollapse={handleToggleLeftPanel}
       />
@@ -278,6 +324,28 @@ export const App: React.FC = () => {
             <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
             <span>{t('app.hub_home')}</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setIsPresetModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 text-xs font-semibold transition-all shadow-sm"
+            title={t('settings.presets_tooltip')}
+          >
+            <Bookmark className="w-3.5 h-3.5" />
+            <span>{t('settings.presets')}</span>
+          </button>
+
+          {activeGameId === 'merge-drop' && (
+            <button
+              type="button"
+              onClick={() => setIsBatchModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-fuchsia-950/80 to-cyan-950/80 hover:from-fuchsia-900 hover:to-cyan-900 text-cyan-300 hover:text-white border border-cyan-500/40 text-xs font-bold transition-all shadow-md active:scale-95 group"
+              title={language === 'fr' ? 'Simulateur Batch IA & Export Vidéo 60 FPS' : 'AI Batch Simulator & 60 FPS Export'}
+            >
+              <Zap className="w-3.5 h-3.5 text-fuchsia-400 group-hover:animate-pulse" />
+              <span>{language === 'fr' ? 'Simulateur IA & Export 60FPS' : 'AI Batch & 60FPS'}</span>
+            </button>
+          )}
 
           <div className="flex items-center gap-2 text-slate-400">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
@@ -321,6 +389,43 @@ export const App: React.FC = () => {
           </button>
         </div>
 
+        {/* Barre flottante d'état et d'arrêt du Replay */}
+        {activeReplay && (
+          <div className="w-full max-w-[500px] mb-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-950/95 via-slate-900/95 to-cyan-950/90 border border-rose-500/60 backdrop-blur-md shadow-xl shadow-rose-950/40 flex items-center justify-between gap-3 animate-fadeIn flex-shrink-0 z-30">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-xs font-extrabold text-white">
+                  <span>{language === 'fr' ? 'Visionnage Simulation' : 'Watching Simulation'}</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-rose-300 border border-rose-500/30">
+                    Seed #{activeReplay.seed}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-300 truncate">
+                  Score Viral: <b className="text-cyan-400">{activeReplay.viralScore}/100</b> • Max Combo: <b className="text-orange-400">x{activeReplay.maxCombo}</b>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                handleStopReplay();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-md transition-all active:scale-95 flex-shrink-0 cursor-pointer"
+              title={language === 'fr' ? 'Arrêter le visionnage et reprendre la partie (Échap)' : 'Stop replay and return to game (Esc)'}
+            >
+              <Square className="w-3 h-3 fill-current" />
+              <span>{language === 'fr' ? 'Quitter le visionnage' : 'Exit Replay'}</span>
+            </button>
+          </div>
+        )}
+
         {/* Viewport 9:16 du jeu */}
         <div className="flex-1 flex items-center justify-center w-full min-h-0">
           <GameViewport
@@ -350,6 +455,7 @@ export const App: React.FC = () => {
         onConfigChange={handleConfigChange}
         onResetConfig={handleResetConfig}
         onResetGame={handleResetGame}
+        onOpenPresets={() => setIsPresetModalOpen(true)}
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
         isRecording={isRecording}
@@ -373,8 +479,28 @@ export const App: React.FC = () => {
         onBackToHub={handleBackToHub}
         onConfigChange={handleConfigChange}
         onResetConfig={handleResetConfig}
+        onOpenPresets={() => setIsPresetModalOpen(true)}
         isOpenMobile={isMobileDrawerOpen}
         onToggleMobile={() => setIsMobileDrawerOpen(!isMobileDrawerOpen)}
+      />
+
+      {/* Modale d'exportation et d'importation de presets */}
+      <PresetModal
+        isOpen={isPresetModalOpen}
+        onClose={() => setIsPresetModalOpen(false)}
+        gameId={activeGameId}
+        gameName={getGameMeta(activeGame.id).name || activeGame.name}
+        currentConfig={activeConfig}
+        onApplyPreset={handleApplyPreset}
+      />
+
+      {/* Modale Simulateur Batch IA & Export Vidéo 60 FPS */}
+      <BatchSimulatorModal
+        isOpen={isBatchModalOpen}
+        onClose={() => setIsBatchModalOpen(false)}
+        config={activeConfig}
+        onPlayReplay={handlePlayReplay}
+        language={language}
       />
     </div>
   );

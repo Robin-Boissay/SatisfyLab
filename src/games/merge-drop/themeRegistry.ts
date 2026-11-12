@@ -1,9 +1,11 @@
 export interface MergeTier {
   tier: number;
+  originalTierIndex?: number; // Index d'origine dans le thème complet (évite tout décalage audio si ACTIVE_TIERS est restreint)
   name: string;
   nameEn: string;
   symbol: string;
   radius: number;
+  visualRadius?: number; // Rayon visuel de l'image (indépendant du ratio de hitbox de collision)
   baseRadius: number;
   color: string;
   secondaryColor?: string;
@@ -75,6 +77,37 @@ class ImageTextureManager {
       if (tier.image) {
         this.getImage(tier.image);
       }
+    }
+  }
+
+  public async preloadThemeImagesAsync(tiers: MergeTier[]): Promise<void> {
+    const promises: Promise<void>[] = [];
+    for (const tier of tiers) {
+      if (tier.image && !this.failed.has(tier.image)) {
+        const cached = this.cache.get(tier.image);
+        if (cached && cached.complete && cached.naturalWidth > 0) continue;
+
+        promises.push(
+          new Promise<void>((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.src = tier.image!;
+            img.onload = () => {
+              this.cache.set(tier.image!, img);
+              this.loading.delete(tier.image!);
+              resolve();
+            };
+            img.onerror = () => {
+              this.loading.delete(tier.image!);
+              this.failed.add(tier.image!);
+              resolve();
+            };
+          })
+        );
+      }
+    }
+    if (promises.length > 0) {
+      await Promise.all(promises);
     }
   }
 }
@@ -159,6 +192,19 @@ export const FRUITS_TIERS: MergeTier[] = [
   { tier: 9, name: '🍉 PASTÈQUE GÉANTE 🍉', nameEn: '🍉 GIANT WATERMELON 🍉', symbol: '🍉', radius: 94, baseRadius: 94, color: '#2a9d8f', secondaryColor: '#e76f51', glowColor: 'rgba(42, 157, 143, 1.0)', points: 1024, image: '/themes/fruits/tier_9.png' }
 ];
 
+export const DRAGONS_TIERS: MergeTier[] = [
+  { tier: 0, name: 'Poussin Jaune', nameEn: 'Baby Chick', symbol: '🐥', radius: 16, baseRadius: 16, color: '#ffea75', secondaryColor: '#ffb703', glowColor: 'rgba(255, 234, 117, 0.85)', points: 2, image: '/themes/dragons/tier_0.png' },
+  { tier: 1, name: 'Oisillon Fauve', nameEn: 'Robin Fledgling', symbol: '🐦', radius: 22, baseRadius: 22, color: '#e07a5f', secondaryColor: '#d94e34', glowColor: 'rgba(224, 122, 95, 0.85)', points: 4, image: '/themes/dragons/tier_1.png' },
+  { tier: 2, name: 'Bébé Griffon', nameEn: 'Griffin Hatchling', symbol: '🦅', radius: 28, baseRadius: 28, color: '#f39c12', secondaryColor: '#d35400', glowColor: 'rgba(243, 156, 18, 0.85)', points: 8, image: '/themes/dragons/tier_2.png' },
+  { tier: 3, name: 'Chouette Mystique', nameEn: 'Mystic Owl', symbol: '🦉', radius: 36, baseRadius: 36, color: '#b08968', secondaryColor: '#7f5539', glowColor: 'rgba(176, 137, 104, 0.85)', points: 16, image: '/themes/dragons/tier_3.png' },
+  { tier: 4, name: 'Draconnet Émeraude', nameEn: 'Emerald Whelpling', symbol: '🐲', radius: 44, baseRadius: 44, color: '#52b788', secondaryColor: '#2d6a4f', glowColor: 'rgba(82, 183, 136, 0.85)', points: 32, image: '/themes/dragons/tier_4.png' },
+  { tier: 5, name: 'Dragonneau Flamboyant', nameEn: 'Ember Drake', symbol: '🔥', radius: 52, baseRadius: 52, color: '#e63946', secondaryColor: '#9b2226', glowColor: 'rgba(230, 57, 70, 0.9)', points: 64, image: '/themes/dragons/tier_5.png' },
+  { tier: 6, name: 'Dragon Azur Cristallin', nameEn: 'Azure Dragon', symbol: '💎', radius: 62, baseRadius: 62, color: '#3a86ff', secondaryColor: '#004080', glowColor: 'rgba(58, 134, 255, 0.9)', points: 128, image: '/themes/dragons/tier_6.png' },
+  { tier: 7, name: 'Dragon Cornu des Forêts', nameEn: 'Forest Horned Dragon', symbol: '🌲', radius: 72, baseRadius: 72, color: '#2a9d8f', secondaryColor: '#1b4332', glowColor: 'rgba(42, 157, 143, 0.9)', points: 256, image: '/themes/dragons/tier_7.png' },
+  { tier: 8, name: 'Dragon Améthyste Royal', nameEn: 'Amethyst Dragon', symbol: '🔮', radius: 82, baseRadius: 82, color: '#7209b7', secondaryColor: '#3a0ca3', glowColor: 'rgba(114, 9, 183, 0.95)', points: 512, image: '/themes/dragons/tier_8.png' },
+  { tier: 9, name: '✨ DRAGON COSMIQUE SUPRÊME ✨', nameEn: '✨ SUPREME COSMIC DRAGON ✨', symbol: '👑', radius: 94, baseRadius: 94, color: '#4cc9f0', secondaryColor: '#b5179e', glowColor: 'rgba(76, 201, 240, 1.0)', points: 1024, image: '/themes/dragons/tier_9.png' }
+];
+
 export const SWEETS_TIERS: MergeTier[] = [
   { tier: 0, name: 'Bonbon Acidulé', nameEn: 'Sour Candy', symbol: '🍬', radius: 16, baseRadius: 16, color: '#ff007f', secondaryColor: '#ffb3d9', glowColor: 'rgba(255, 0, 127, 0.8)', points: 2, image: '/themes/sweets/tier_0.png' },
   { tier: 1, name: 'Guimauve Douce', nameEn: 'Marshmallow', symbol: '🍥', radius: 22, baseRadius: 22, color: '#d8b4e2', secondaryColor: '#f7d6e0', glowColor: 'rgba(216, 180, 226, 0.8)', points: 4, image: '/themes/sweets/tier_1.png' },
@@ -170,6 +216,32 @@ export const SWEETS_TIERS: MergeTier[] = [
   { tier: 7, name: 'Glace Fraise', nameEn: 'Ice Cream', symbol: '🍨', radius: 72, baseRadius: 72, color: '#ff70a6', secondaryColor: '#ffd670', glowColor: 'rgba(255, 112, 166, 0.9)', points: 256, image: '/themes/sweets/tier_7.png' },
   { tier: 8, name: 'Tarte Dorée', nameEn: 'Fruit Tart', symbol: '🥧', radius: 82, baseRadius: 82, color: '#ff9770', secondaryColor: '#e9ff70', glowColor: 'rgba(255, 151, 112, 0.9)', points: 512, image: '/themes/sweets/tier_8.png' },
   { tier: 9, name: '🎂 GÂTEAU DE FÊTE GÉANT 🎂', nameEn: '🎂 GIANT CELEBRATION CAKE 🎂', symbol: '🎂', radius: 94, baseRadius: 94, color: '#ff007f', secondaryColor: '#ffd700', glowColor: 'rgba(255, 0, 127, 1.0)', points: 1024, image: '/themes/sweets/tier_9.png' }
+];
+
+export const ELEMENTAL_POTATOES_TIERS: MergeTier[] = [
+  { tier: 0, name: 'La patate de Terre', nameEn: 'Earth', symbol: '🌱', radius: 16, baseRadius: 16, color: '#c49a6c', secondaryColor: '#8a5a36', glowColor: 'rgba(196, 154, 108, 0.8)', points: 2, image: '/themes/elemental_potatoes/tier_0.png' },
+  { tier: 1, name: 'La patate Racines', nameEn: 'Roots', symbol: '🌿', radius: 22, baseRadius: 22, color: '#7cb518', secondaryColor: '#5c8001', glowColor: 'rgba(124, 181, 24, 0.8)', points: 4, image: '/themes/elemental_potatoes/tier_1.png' },
+  { tier: 2, name: 'La patate Aquatique', nameEn: 'Aqua', symbol: '💧', radius: 28, baseRadius: 28, color: '#48cae4', secondaryColor: '#0077b6', glowColor: 'rgba(72, 202, 228, 0.8)', points: 8, image: '/themes/elemental_potatoes/tier_2.png' },
+  { tier: 3, name: 'la patate de Glace', nameEn: 'Ice', symbol: '❄️', radius: 36, baseRadius: 36, color: '#a0c4ff', secondaryColor: '#caf0f8', glowColor: 'rgba(160, 196, 255, 0.85)', points: 16, image: '/themes/elemental_potatoes/tier_3.png' },
+  { tier: 4, name: 'la patate Végétale', nameEn: 'Flora', symbol: '🌸', radius: 44, baseRadius: 44, color: '#2ec4b6', secondaryColor: '#ff99c8', glowColor: 'rgba(46, 196, 182, 0.85)', points: 32, image: '/themes/elemental_potatoes/tier_4.png' },
+  { tier: 5, name: 'la patate Tempête', nameEn: 'Storm', symbol: '🌪️', radius: 52, baseRadius: 52, color: '#b0c4de', secondaryColor: '#4682b4', glowColor: 'rgba(176, 196, 222, 0.85)', points: 64, image: '/themes/elemental_potatoes/tier_5.png' },
+  { tier: 6, name: 'la patate Électrique', nameEn: 'Lightning', symbol: '⚡', radius: 62, baseRadius: 62, color: '#ffd166', secondaryColor: '#06d6a0', glowColor: 'rgba(255, 209, 102, 0.85)', points: 128, image: '/themes/elemental_potatoes/tier_6.png' },
+  { tier: 7, name: 'la patate Volcanique', nameEn: 'Volcanic', symbol: '🌋', radius: 72, baseRadius: 72, color: '#e63946', secondaryColor: '#f77f00', glowColor: 'rgba(230, 57, 70, 0.9)', points: 256, image: '/themes/elemental_potatoes/tier_7.png' },
+  { tier: 8, name: 'la patateStellaire', nameEn: 'Stellar', symbol: '🌌', radius: 82, baseRadius: 82, color: '#7209b7', secondaryColor: '#3f37c9', glowColor: 'rgba(114, 9, 183, 0.9)', points: 512, image: '/themes/elemental_potatoes/tier_8.png' },
+  { tier: 9, name: 'la patate CÉLESTE', nameEn: 'COSMIC', symbol: '👑', radius: 94, baseRadius: 94, color: '#c77dff', secondaryColor: '#ffd700', glowColor: 'rgba(199, 125, 255, 1.0)', points: 1024, image: '/themes/elemental_potatoes/tier_9.png' }
+];
+
+export const CAREER_POTATOES_TIERS: MergeTier[] = [
+  { tier: 0, name: 'La patate Stagiaire', nameEn: 'Intern', symbol: '☕', radius: 16, baseRadius: 16, color: '#d4a373', secondaryColor: '#8d6e63', glowColor: 'rgba(212, 163, 115, 0.8)', points: 2, image: '/themes/career_potatoes/tier_0.png' },
+  { tier: 1, name: 'La patate Livreuse', nameEn: 'Delivery', symbol: '🚲', radius: 22, baseRadius: 22, color: '#2ecc71', secondaryColor: '#1b5e20', glowColor: 'rgba(46, 204, 113, 0.8)', points: 4, image: '/themes/career_potatoes/tier_1.png' },
+  { tier: 2, name: 'La patate Cuistot', nameEn: 'Chef', symbol: '👨‍🍳', radius: 28, baseRadius: 28, color: '#e2e8f0', secondaryColor: '#94a3b8', glowColor: 'rgba(226, 232, 240, 0.8)', points: 8, image: '/themes/career_potatoes/tier_2.png' },
+  { tier: 3, name: 'La patate Pompier', nameEn: 'Firefighter', symbol: '🚒', radius: 36, baseRadius: 36, color: '#ef4444', secondaryColor: '#f97316', glowColor: 'rgba(239, 68, 68, 0.85)', points: 16, image: '/themes/career_potatoes/tier_3.png' },
+  { tier: 4, name: 'La patate Policier', nameEn: 'Police', symbol: '🚓', radius: 44, baseRadius: 44, color: '#3b82f6', secondaryColor: '#8b5cf6', glowColor: 'rgba(59, 130, 246, 0.85)', points: 32, image: '/themes/career_potatoes/tier_4.png' },
+  { tier: 5, name: 'La patate Scientifique', nameEn: 'Scientist', symbol: '🧪', radius: 52, baseRadius: 52, color: '#facc15', secondaryColor: '#f59e0b', glowColor: 'rgba(250, 204, 21, 0.85)', points: 64, image: '/themes/career_potatoes/tier_5.png' },
+  { tier: 6, name: 'La patate Astronaute', nameEn: 'Astronaut', symbol: '🚀', radius: 62, baseRadius: 62, color: '#38bdf8', secondaryColor: '#818cf8', glowColor: 'rgba(56, 189, 248, 0.85)', points: 128, image: '/themes/career_potatoes/tier_6.png' },
+  { tier: 7, name: 'La patate PDG', nameEn: 'CEO', symbol: '💼', radius: 72, baseRadius: 72, color: '#334155', secondaryColor: '#dc2626', glowColor: 'rgba(71, 85, 105, 0.9)', points: 256, image: '/themes/career_potatoes/tier_7.png' },
+  { tier: 8, name: 'La patate Président', nameEn: 'President', symbol: '🇫🇷', radius: 82, baseRadius: 82, color: '#ec4899', secondaryColor: '#3b82f6', glowColor: 'rgba(236, 72, 153, 0.9)', points: 512, image: '/themes/career_potatoes/tier_8.png' },
+  { tier: 9, name: 'La patate MILLIARDAIRE', nameEn: 'BILLIONAIRE', symbol: '💰', radius: 94, baseRadius: 94, color: '#ffd700', secondaryColor: '#f59e0b', glowColor: 'rgba(255, 215, 0, 1.0)', points: 1024, image: '/themes/career_potatoes/tier_9.png' }
 ];
 
 export const MERGE_THEMES: Record<string, MergeThemeDefinition> = {
@@ -214,6 +286,48 @@ export const MERGE_THEMES: Record<string, MergeThemeDefinition> = {
     defaultContainerColor: '#ff007f',
     defaultBackgroundColor: '#0d0614',
     tiers: ANIMALS_TIERS
+  },
+  elemental_potatoes: {
+    id: 'elemental_potatoes',
+    label: '🥔 Patates Élémentaires',
+    labelEn: '🥔 Elemental Potatoes',
+    description: 'De la modeste patate de terre jusqu’à la divine Patate Céleste.',
+    descriptionEn: 'From the humble dirt potato to the divine Cosmic Potato.',
+    renderStyle: 'glossy',
+    defaultTitle: 'Patates',
+    defaultTitleEn: 'Potatoes',
+    metricMaxLabel: 'PALIER MAX',
+    metricMaxLabelEn: 'MAX TIER',
+    victoryText: '👑 PATATE ULTIME ÉVEILLÉE ! 👑',
+    victoryTextEn: '👑 ULTIMATE POTATO AWAKENED! 👑',
+    streamStartLabel: 'LANCER RAFALE NIVEAU 1',
+    streamStartLabelEn: 'LAUNCH TIER 1 STREAM',
+    streamStopLabel: 'ARRÊTER RAFALE NIVEAU 1',
+    streamStopLabelEn: 'STOP TIER 1 STREAM',
+    defaultContainerColor: '#b854ff',
+    defaultBackgroundColor: '#07050d',
+    tiers: ELEMENTAL_POTATOES_TIERS
+  },
+  career_potatoes: {
+    id: 'career_potatoes',
+    label: '💼 Patates Métiers',
+    labelEn: '💼 Career Potatoes',
+    description: 'De la timide patate stagiaire jusqu’à la toute-puissante Patate Milliardaire.',
+    descriptionEn: 'From the humble intern potato to the almighty Billionaire Potato.',
+    renderStyle: 'glossy',
+    defaultTitle: 'Patates',
+    defaultTitleEn: 'Potatoes',
+    metricMaxLabel: 'PALIER MAX',
+    metricMaxLabelEn: 'MAX TIER',
+    victoryText: '💰 PATATE MILLIARDAIRE DÉBLOQUÉE ! 💰',
+    victoryTextEn: '💰 BILLIONAIRE POTATO UNLOCKED! 💰',
+    streamStartLabel: 'LANCER RAFALE NIVEAU 1',
+    streamStartLabelEn: 'LAUNCH TIER 1 STREAM',
+    streamStopLabel: 'ARRÊTER RAFALE NIVEAU 1',
+    streamStopLabelEn: 'STOP TIER 1 STREAM',
+    defaultContainerColor: '#ffd700',
+    defaultBackgroundColor: '#07050d',
+    tiers: CAREER_POTATOES_TIERS
   },
   vegetables: {
     id: 'vegetables',
@@ -317,7 +431,28 @@ export const MERGE_THEMES: Record<string, MergeThemeDefinition> = {
     defaultContainerColor: '#00f0ff',
     defaultBackgroundColor: '#05070f',
     tiers: NEON_TIERS
-  }
+  },
+  dragons: {
+    id: 'dragons',
+    label: '🐉 Évolution Dragon',
+    labelEn: '🐉 Dragon Evolution',
+    description: 'Du petit poussin tout mignon jusqu’au grandiose Dragon Cosmique Suprême.',
+    descriptionEn: 'From tiny cute chick to the Supreme Cosmic Dragon.',
+    renderStyle: 'glossy',
+    defaultTitle: '🐉 ÉVOLUTION DRAGON',
+    defaultTitleEn: '🐉 DRAGON EVOLUTION',
+    metricMaxLabel: 'CRÉATURE MAX',
+    metricMaxLabelEn: 'MAX CREATURE',
+    victoryText: '✨ DRAGON COSMIQUE INVOQUÉ ! ✨',
+    victoryTextEn: '✨ COSMIC DRAGON AWAKENED! ✨',
+    streamStartLabel: 'LANCER RAFALE DE POUSSINS',
+    streamStartLabelEn: 'LAUNCH CHICK STREAM',
+    streamStopLabel: 'ARRÊTER RAFALE DE POUSSINS',
+    streamStopLabelEn: 'STOP CHICK STREAM',
+    defaultContainerColor: 'rainbow',
+    defaultBackgroundColor: '#070a14',
+    tiers: DRAGONS_TIERS
+  },
 };
 
 export const THEME_OPTIONS = Object.values(MERGE_THEMES).map((theme) => ({

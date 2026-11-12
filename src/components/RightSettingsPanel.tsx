@@ -12,7 +12,8 @@ import {
   VolumeX,
   Video,
   PlayCircle,
-  Zap
+  Zap,
+  Bookmark
 } from 'lucide-react';
 
 interface RightSettingsPanelProps {
@@ -21,6 +22,7 @@ interface RightSettingsPanelProps {
   onConfigChange: (key: string, value: any) => void;
   onResetConfig: () => void;
   onResetGame: () => void;
+  onOpenPresets?: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
   isRecording: boolean;
@@ -36,6 +38,7 @@ export const RightSettingsPanel: React.FC<RightSettingsPanelProps> = ({
   onConfigChange,
   onResetConfig,
   onResetGame,
+  onOpenPresets,
   isMuted,
   onToggleMute,
   isRecording,
@@ -58,6 +61,17 @@ export const RightSettingsPanel: React.FC<RightSettingsPanelProps> = ({
           >
             <PanelRightOpen className="w-4 h-4 group-hover:scale-110 transition-transform" />
           </button>
+
+          {onOpenPresets && (
+            <button
+              type="button"
+              onClick={onOpenPresets}
+              title={t('settings.presets_tooltip')}
+              className="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800/80 text-cyan-400 hover:text-cyan-300 transition-all shadow-sm"
+            >
+              <Bookmark className="w-4 h-4" />
+            </button>
+          )}
 
           <button
             type="button"
@@ -105,15 +119,29 @@ export const RightSettingsPanel: React.FC<RightSettingsPanelProps> = ({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onResetConfig}
-          title={t('settings.reset_all')}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-400 border border-slate-800 text-[11px] font-semibold transition-all"
-        >
-          <RotateCcw className="w-3 h-3" />
-          <span className="hidden xl:inline">{language === 'fr' ? 'Défaut' : 'Reset'}</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          {onOpenPresets && (
+            <button
+              type="button"
+              onClick={onOpenPresets}
+              title={t('settings.presets_tooltip')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 text-[11px] font-semibold transition-all shadow-sm"
+            >
+              <Bookmark className="w-3 h-3" />
+              <span>{t('settings.presets')}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onResetConfig}
+            title={t('settings.reset_all')}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-400 border border-slate-800 text-[11px] font-semibold transition-all"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span className="hidden xl:inline">{language === 'fr' ? 'Défaut' : 'Reset'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Contenu déroulant */}

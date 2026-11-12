@@ -1,4 +1,4 @@
-export type ConfigFieldType = 'range' | 'boolean' | 'color' | 'select' | 'number' | 'text';
+export type ConfigFieldType = 'range' | 'boolean' | 'color' | 'select' | 'number' | 'text' | 'tier-list' | 'action-button';
 
 export interface BaseConfigField {
   id: string;
@@ -47,13 +47,30 @@ export interface StringConfigField extends BaseConfigField {
   defaultValue: string;
 }
 
+export interface TierListConfigField extends BaseConfigField {
+  type: 'tier-list';
+  minCount?: number;
+  maxCount?: number;
+  defaultValue: number[];
+}
+
+export interface ActionButtonConfigField extends BaseConfigField {
+  type: 'action-button';
+  buttonText: string;
+  actionId: string;
+  icon?: string;
+  variant?: 'primary' | 'secondary' | 'accent' | 'danger' | 'success';
+}
+
 export type ConfigField =
   | RangeConfigField
   | BooleanConfigField
   | ColorConfigField
   | SelectConfigField
   | NumberConfigField
-  | StringConfigField;
+  | StringConfigField
+  | TierListConfigField
+  | ActionButtonConfigField;
 
 export type ConfigSchema = Record<string, ConfigField>;
 

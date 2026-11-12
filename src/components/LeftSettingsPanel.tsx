@@ -11,7 +11,8 @@ import {
   Volume2,
   PanelLeftClose,
   PanelLeftOpen,
-  Palette
+  Palette,
+  Bookmark
 } from 'lucide-react';
 
 interface LeftSettingsPanelProps {
@@ -22,6 +23,7 @@ interface LeftSettingsPanelProps {
   onBackToHub: () => void;
   onConfigChange: (key: string, value: any) => void;
   onResetConfig: () => void;
+  onOpenPresets?: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }
@@ -34,6 +36,7 @@ export const LeftSettingsPanel: React.FC<LeftSettingsPanelProps> = ({
   onBackToHub,
   onConfigChange,
   onResetConfig,
+  onOpenPresets,
   isCollapsed,
   onToggleCollapse
 }) => {
@@ -93,7 +96,19 @@ export const LeftSettingsPanel: React.FC<LeftSettingsPanelProps> = ({
           <span>{t('settings.back_to_hub')}</span>
         </button>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          {onOpenPresets && (
+            <button
+              type="button"
+              onClick={onOpenPresets}
+              title={t('settings.presets_tooltip')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 text-[11px] font-semibold transition-all shadow-sm"
+            >
+              <Bookmark className="w-3 h-3" />
+              <span>{t('settings.presets')}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onToggleCollapse}

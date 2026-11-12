@@ -7,7 +7,8 @@ export class MergeBall {
   y: number;
   vx: number = 0;
   vy: number = 0;
-  radius: number;
+  radius: number; // Rayon physique de collision (Hitbox)
+  visualRadius: number; // Rayon visuel d'affichage de l'image
   mass: number;
   tierData: MergeTier;
   theme: SkinTheme;
@@ -21,6 +22,10 @@ export class MergeBall {
   age: number = 0; // Temps écoulé depuis l'apparition
   baseRadius: number = 16;
   hasLanded: boolean = false; // Vrai uniquement quand la bille a touché le fond ou la pile
+  showOutline: boolean = true;
+  hitboxScale: number = 1.0;
+  showHitboxDebug: boolean = false;
+  private currentTiers?: MergeTier[];
 
   constructor(
     id: number,
@@ -29,15 +34,28 @@ export class MergeBall {
     y: number,
     theme: SkinTheme = 'solar',
     isNewMerge: boolean = false,
-    baseRadius: number = 16
+    baseRadius: number = 16,
+    customTiers?: MergeTier[],
+    showOutline: boolean = true,
+    hitboxScale: number = 1.0,
+    showHitboxDebug: boolean = false
   ) {
     this.id = id;
     this.theme = theme;
     this.baseRadius = baseRadius;
-    const tiers = getTiersForTheme(theme, baseRadius);
+    this.currentTiers = customTiers;
+    this.showOutline = showOutline;
+    this.hitboxScale = Math.max(0.4, Math.min(2.0, hitboxScale ?? 1.0));
+    this.showHitboxDebug = showHitboxDebug ?? false;
+
+    const tiers = customTiers || getTiersForTheme(theme, baseRadius);
     this.tier = Math.min(tier, tiers.length - 1);
     this.tierData = tiers[this.tier];
-    this.radius = this.tierData.radius;
+    this.visualRadius = this.tierData.visualRadius || this.tierData.radius;
+    // Le rayon physique de collision s'ajuste avec l'échelle de hitbox
+    this.radius = this.tierData.visualRadius
+      ? this.tierData.radius
+      : Math.max(4, Math.round(this.visualRadius * this.hitboxScale * 10) / 10);
     this.mass = Math.pow(this.radius, 2);
     this.x = x;
     this.y = y;
@@ -52,20 +70,62 @@ export class MergeBall {
     }
   }
 
-  public setTheme(theme: SkinTheme, baseRadius?: number) {
-    this.theme = theme;
-    if (baseRadius !== undefined) this.baseRadius = baseRadius;
-    const tiers = getTiersForTheme(theme, this.baseRadius);
+  public setActiveTiers(tiers: MergeTier[]) {
+    this.currentTiers = tiers;
+    this.tier = Math.min(this.tier, tiers.length - 1);
     this.tierData = tiers[this.tier];
-    this.radius = this.tierData.radius;
+    this.visualRadius = this.tierData.visualRadius || this.tierData.radius;
+    this.radius = this.tierData.visualRadius
+      ? this.tierData.radius
+      : Math.max(4, Math.round(this.visualRadius * this.hitboxScale * 10) / 10);
     this.mass = Math.pow(this.radius, 2);
   }
 
-  public updateRadius(baseRadius: number) {
-    this.baseRadius = baseRadius;
-    const tiers = getTiersForTheme(this.theme, baseRadius);
+  public setTheme(theme: SkinTheme, baseRadius?: number, activeTiers?: MergeTier[]) {
+    this.theme = theme;
+    if (baseRadius !== undefined) this.baseRadius = baseRadius;
+    if (activeTiers) this.currentTiers = activeTiers;
+    const tiers = this.currentTiers || getTiersForTheme(theme, this.baseRadius);
+    this.tier = Math.min(this.tier, tiers.length - 1);
     this.tierData = tiers[this.tier];
-    this.radius = this.tierData.radius;
+    this.visualRadius = this.tierData.visualRadius || this.tierData.radius;
+    this.radius = this.tierData.visualRadius
+      ? this.tierData.radius
+      : Math.max(4, Math.round(this.visualRadius * this.hitboxScale * 10) / 10);
+    this.mass = Math.pow(this.radius, 2);
+  }
+
+  public setShowOutline(showOutline: boolean) {
+    this.showOutline = showOutline;
+  }
+
+  public setHitboxScale(hitboxScale: number, activeTiers?: MergeTier[]) {
+    this.hitboxScale = Math.max(0.4, Math.min(2.0, hitboxScale));
+    if (activeTiers) this.currentTiers = activeTiers;
+    const tiers = this.currentTiers || getTiersForTheme(this.theme, this.baseRadius);
+    this.tier = Math.min(this.tier, tiers.length - 1);
+    this.tierData = tiers[this.tier];
+    this.visualRadius = this.tierData.visualRadius || this.tierData.radius;
+    this.radius = this.tierData.visualRadius
+      ? this.tierData.radius
+      : Math.max(4, Math.round(this.visualRadius * this.hitboxScale * 10) / 10);
+    this.mass = Math.pow(this.radius, 2);
+  }
+
+  public setShowHitboxDebug(show: boolean) {
+    this.showHitboxDebug = show;
+  }
+
+  public updateRadius(baseRadius: number, activeTiers?: MergeTier[]) {
+    this.baseRadius = baseRadius;
+    if (activeTiers) this.currentTiers = activeTiers;
+    const tiers = this.currentTiers || getTiersForTheme(this.theme, baseRadius);
+    this.tier = Math.min(this.tier, tiers.length - 1);
+    this.tierData = tiers[this.tier];
+    this.visualRadius = this.tierData.visualRadius || this.tierData.radius;
+    this.radius = this.tierData.visualRadius
+      ? this.tierData.radius
+      : Math.max(4, Math.round(this.visualRadius * this.hitboxScale * 10) / 10);
     this.mass = Math.pow(this.radius, 2);
   }
 
@@ -84,7 +144,8 @@ export class MergeBall {
   }
 
   draw(context: CanvasRenderingContext2D) {
-    const currentRadius = this.radius * this.scale;
+    const visualR = (this.visualRadius || this.radius) * this.scale;
+    const hitboxR = this.radius * this.scale;
 
     context.save();
     context.translate(this.x, this.y);
@@ -93,24 +154,41 @@ export class MergeBall {
     const img = imageSrc ? textureManager.getImage(imageSrc) : null;
 
     if (img) {
-      this.drawSpriteBall(context, currentRadius, img);
+      this.drawSpriteBall(context, visualR, img);
     } else {
       const themeDef = getThemeDefinition(this.theme);
       switch (themeDef.renderStyle) {
         case 'solar':
-          this.drawSolarBody(context, currentRadius);
+          this.drawSolarBody(context, visualR);
           break;
         case 'neon':
-          this.drawNeonOrb(context, currentRadius);
+          this.drawNeonOrb(context, visualR);
           break;
         case 'gem':
-          this.drawGemStone(context, currentRadius);
+          this.drawGemStone(context, visualR);
           break;
         case 'glossy':
         default:
-          this.drawGlossyBadge(context, currentRadius);
+          this.drawGlossyBadge(context, visualR);
           break;
       }
+    }
+
+    // Affichage debug du contour de la hitbox physique ronde
+    if (this.showHitboxDebug) {
+      context.save();
+      context.beginPath();
+      context.arc(0, 0, hitboxR, 0, Math.PI * 2);
+      context.strokeStyle = this.hitboxScale > 1.0 ? 'rgba(0, 240, 255, 0.95)' : 'rgba(0, 255, 102, 0.95)';
+      context.lineWidth = 2.2;
+      context.setLineDash([5, 4]);
+      context.stroke();
+
+      context.beginPath();
+      context.arc(0, 0, 2.5, 0, Math.PI * 2);
+      context.fillStyle = '#ffffff';
+      context.fill();
+      context.restore();
     }
 
     context.restore();
@@ -122,24 +200,28 @@ export class MergeBall {
   private drawSpriteBall(context: CanvasRenderingContext2D, r: number, img: HTMLImageElement) {
     const td = this.tierData;
 
-    // Halo / Aura extérieure
-    context.save();
-    context.beginPath();
-    context.arc(0, 0, r * 1.25, 0, Math.PI * 2);
-    const aura = context.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 1.25);
-    aura.addColorStop(0, td.glowColor);
-    aura.addColorStop(1, 'rgba(0,0,0,0)');
-    context.fillStyle = aura;
-    context.globalAlpha = 0.55;
-    context.fill();
-    context.restore();
+    // Halo / Aura extérieure (uniquement si l'option est active)
+    if (this.showOutline) {
+      context.save();
+      context.beginPath();
+      context.arc(0, 0, r * 1.25, 0, Math.PI * 2);
+      const aura = context.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 1.25);
+      aura.addColorStop(0, td.glowColor);
+      aura.addColorStop(1, 'rgba(0,0,0,0)');
+      context.fillStyle = aura;
+      context.globalAlpha = 0.55;
+      context.fill();
+      context.restore();
+    }
 
     // Rendu du sprite avec rotation physique
     context.save();
     context.rotate(this.rotation);
 
-    context.shadowColor = this.flash > 0 ? '#ffffff' : td.glowColor;
-    context.shadowBlur = 12 + this.flash * 20;
+    if (this.showOutline || this.flash > 0) {
+      context.shadowColor = this.flash > 0 ? '#ffffff' : td.glowColor;
+      context.shadowBlur = this.flash > 0 ? (12 + this.flash * 20) : 8;
+    }
 
     const drawR = r * 0.98;
     context.drawImage(img, -drawR, -drawR, drawR * 2, drawR * 2);
@@ -202,10 +284,12 @@ export class MergeBall {
       context.restore();
     }
 
-    // Bordure douce
-    context.lineWidth = Math.max(1.5, r * 0.05);
-    context.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-    context.stroke();
+    // Bordure douce (si option active)
+    if (this.showOutline) {
+      context.lineWidth = Math.max(1.5, r * 0.05);
+      context.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      context.stroke();
+    }
 
     // Emoji / Symbole au centre (avec rotation physique douce)
     context.save();

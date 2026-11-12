@@ -1,20 +1,17 @@
 import { GameInstance, GameHUDState } from '../../core/types';
 import { sound } from '../../core/SoundEngine';
 import { drawCanvasHUD } from '../../core/canvasHUD';
-import {
-  BallEscapeConfig,
-  DEFAULT_BALL_ESCAPE_CONFIG
-} from './types';
+import { PRNG } from '../../core/math/prng';
+import { BallEscapeConfig, DEFAULT_BALL_ESCAPE_CONFIG } from './types';
 import {
   VIRTUAL_WIDTH,
   VIRTUAL_HEIGHT,
   CENTER_X,
-  CENTER_Y,
+  DEFAULT_CENTER_Y,
   Particle,
   Shockwave,
-  WallSegment,
-  Ball,
-  SecondaryBall
+  ArenaRing,
+  Ball
 } from './entities';
 
 export class BallEscapeGame implements GameInstance {
@@ -22,6 +19,7 @@ export class BallEscapeGame implements GameInstance {
   private ctx: CanvasRenderingContext2D;
   private onHUDUpdate: (hud: GameHUDState) => void;
   private config: BallEscapeConfig;
+  private prng: PRNG;
 
   private isRunning: boolean = false;
   private isDestroyed: boolean = false;
@@ -30,22 +28,30 @@ export class BallEscapeGame implements GameInstance {
 
   private state: 'WAITING' | 'RUNNING' | 'ESCAPED' | 'FROZEN' = 'WAITING';
   private bounces: number = 0;
-  private arenaAngle: number = 0;
   private screenShake: number = 0;
   private shakeX: number = 0;
   private shakeY: number = 0;
   private timeLeft: number;
   private freezeTimer: number = 0;
+  private loopCountdown: number = 0;
+  private timeScale: number = 1.0;
   private hasEscaped: boolean = false;
   private maxSpeedReached: number;
+  private winnerTeam?: string;
 
-  private segments: WallSegment[] = [];
+  // Entités
+  private rings: ArenaRing[] = [];
   private particles: Particle[] = [];
   private shockwaves: Shockwave[] = [];
-  private ball: Ball;
-  private secondaryBalls: SecondaryBall[] = [];
+  private balls: Ball[] = [];
   private currentHUD: GameHUDState = {};
 
+  // Éléments de fond animé
+  private bgStars: { x: number; y: number; speed: number; size: number; alpha: number }[] = [];
+  private bgRayAngle: number = 0;
+  private bgGridOffset: number = 0;
+
+  // Viewport
   private viewScale: number = 1;
   private offsetX: number = 0;
   private offsetY: number = 0;
@@ -59,13 +65,14 @@ export class BallEscapeGame implements GameInstance {
     this.ctx = canvas.getContext('2d')!;
     this.onHUDUpdate = onHUDUpdate;
     this.config = { ...DEFAULT_BALL_ESCAPE_CONFIG, ...initialConfig };
+    this.prng = new PRNG(this.config.SEED || 12345);
 
     this.timeLeft = this.config.CHALLENGE_TIME_LIMIT;
     this.maxSpeedReached = this.config.INITIAL_SPEED;
-    this.ball = new Ball(CENTER_X, CENTER_Y, this.config.BALL_RADIUS);
 
-    this.initSegments();
-    this.initSecondaryBalls();
+    this.initBackgroundStars();
+    this.initArena();
+    this.initBalls();
     this.resize();
 
     window.addEventListener('resize', this.handleResize);
@@ -78,36 +85,116 @@ export class BallEscapeGame implements GameInstance {
     this.resize();
   };
 
-  private initSegments() {
-    this.segments = [];
-    const step = (Math.PI * 2) / this.config.TOTAL_WALL_SEGMENTS;
-    for (let i = 0; i < this.config.TOTAL_WALL_SEGMENTS; i++) {
-      const start = i * step;
-      const end = (i + 1) * step;
-      this.segments.push(new WallSegment(i, start, end, this.config.SEGMENT_HP));
+  private getCenterY(): number {
+    return this.config.ARENA_CENTER_Y !== undefined
+      ? this.config.ARENA_CENTER_Y
+      : DEFAULT_CENTER_Y;
+  }
+
+  private initBackgroundStars() {
+    this.bgStars = [];
+    for (let i = 0; i < 45; i++) {
+      this.bgStars.push({
+        x: this.prng.range(0, VIRTUAL_WIDTH),
+        y: this.prng.range(0, VIRTUAL_HEIGHT),
+        speed: this.prng.range(12, 37),
+        size: this.prng.range(1, 3),
+        alpha: this.prng.range(0.2, 0.8)
+      });
     }
   }
 
-  private initSecondaryBalls() {
-    this.secondaryBalls = [];
-    const count = this.config.INITIAL_SECONDARY_BALLS_COUNT || 0;
-    for (let i = 0; i < count; i++) {
-      this.secondaryBalls.push(SecondaryBall.createRandom(this.config, CENTER_X, CENTER_Y));
+  private initArena() {
+    this.rings = [];
+    const isClassic = this.config.GAME_MODE === 'classic';
+    const isMultiRing =
+      !isClassic &&
+      (this.config.GAME_MODE === 'multi-ring' || (this.config.RING_COUNT && this.config.RING_COUNT > 1));
+    const ringCount = isMultiRing ? Math.max(2, Math.min(6, this.config.RING_COUNT || 3)) : 1;
+    const spacing = this.config.RING_SPACING || 36;
+    const baseRadius = this.config.CIRCLE_RADIUS || 180;
+    const innerRadius = Math.max(65, baseRadius - (ringCount - 1) * spacing);
+    const gapMode = isClassic ? 'bricks' : (this.config.RING_GAP_MODE || 'rotating-gap');
+    const gapSizeRad = (this.config.GAP_SIZE_DEGREES || 36) * (Math.PI / 180);
+
+    for (let i = 0; i < ringCount; i++) {
+      const radius = innerRadius + i * spacing;
+      const dir = i % 2 === 0 ? 1 : -1;
+      const rotSpeed = dir * (0.2 + i * 0.08) * (this.config.ARENA_ROTATION_SPEED || 0.35);
+      const segCount = Math.max(12, Math.round(this.config.TOTAL_WALL_SEGMENTS * (radius / baseRadius)));
+      const segHp = Math.max(1, this.config.SEGMENT_HP || 3);
+
+      this.rings.push(new ArenaRing(i, radius, rotSpeed, segCount, segHp, gapMode, gapSizeRad));
+    }
+  }
+
+  private initBalls() {
+    this.balls = [];
+    const cy = this.getCenterY();
+    const mode = this.config.GAME_MODE;
+
+    if (mode === 'duel') {
+      const count = Math.max(2, Math.min(8, this.config.BATTLE_BALL_COUNT || 2));
+      for (let i = 0; i < count; i++) {
+        const teamKey = `p${i + 1}`;
+        const b = new Ball(i, CENTER_X, cy, this.config.BALL_RADIUS, teamKey);
+        // Angle initial réparti en étoile pour un envol dynamique
+        const spreadAngle = (i / count) * Math.PI * 2 + this.prng.jitter(0.25) - Math.PI / 2;
+        b.reset(CENTER_X, cy, this.config, spreadAngle, this.prng);
+        this.balls.push(b);
+      }
+    } else {
+      const mainBall = new Ball(0, CENTER_X, cy, this.config.BALL_RADIUS);
+      const angle = this.prng.range(0.2, 0.8) * Math.PI * (this.prng.next() < 0.5 ? 1 : -1);
+      mainBall.reset(CENTER_X, cy, this.config, angle, this.prng);
+      this.balls.push(mainBall);
+
+      if (mode === 'ball-storm') {
+        const initialCount = 4;
+        for (let i = 1; i <= initialCount; i++) {
+          const stormBall = new Ball(i, CENTER_X, cy, this.config.BALL_RADIUS * 0.9);
+          const sAngle = (i / initialCount) * Math.PI * 2 + this.prng.jitter(0.25);
+          stormBall.reset(CENTER_X, cy, this.config, sAngle, this.prng);
+          this.balls.push(stormBall);
+        }
+      }
     }
   }
 
   public updateConfig(newConfig: Partial<BallEscapeConfig>) {
-    const prevSegmentsCount = this.config.TOTAL_WALL_SEGMENTS;
-    const prevHp = this.config.SEGMENT_HP;
+    const prevMode = this.config.GAME_MODE;
+    const prevSeed = this.config.SEED;
+    const prevCount = this.config.BATTLE_BALL_COUNT;
 
     this.config = { ...this.config, ...newConfig };
 
-    // Si le nombre de briques ou la vie par défaut change et qu'on est en pause ou restart
-    if (
-      this.state === 'WAITING' &&
-      (newConfig.TOTAL_WALL_SEGMENTS !== undefined || newConfig.SEGMENT_HP !== undefined)
-    ) {
-      this.initSegments();
+    if (newConfig.SEED !== undefined && newConfig.SEED !== prevSeed) {
+      this.prng.reseed(newConfig.SEED);
+    }
+
+    const modeChanged = newConfig.GAME_MODE !== undefined && newConfig.GAME_MODE !== prevMode;
+    const battleCountChanged =
+      newConfig.BATTLE_BALL_COUNT !== undefined && newConfig.BATTLE_BALL_COUNT !== prevCount;
+    const ringChanged =
+      newConfig.RING_COUNT !== undefined ||
+      newConfig.TOTAL_WALL_SEGMENTS !== undefined ||
+      newConfig.SEGMENT_HP !== undefined ||
+      newConfig.CIRCLE_RADIUS !== undefined ||
+      newConfig.RING_GAP_MODE !== undefined ||
+      newConfig.GAP_SIZE_DEGREES !== undefined ||
+      newConfig.RING_SPACING !== undefined ||
+      newConfig.ARENA_ROTATION_SPEED !== undefined;
+
+    if (modeChanged || ringChanged) {
+      this.initArena();
+    }
+
+    if (modeChanged || battleCountChanged || ringChanged) {
+      this.initBalls();
+    } else {
+      for (let i = 0; i < this.balls.length; i++) {
+        this.balls[i].updateColor(this.config);
+      }
     }
 
     this.syncHUD();
@@ -123,20 +210,22 @@ export class BallEscapeGame implements GameInstance {
   }
 
   public reset() {
+    this.prng.reseed(this.config.SEED || 12345);
     this.state = 'RUNNING';
     this.bounces = 0;
-    this.arenaAngle = 0;
     this.screenShake = 0;
     this.timeLeft = this.config.CHALLENGE_TIME_LIMIT;
     this.freezeTimer = 0;
+    this.loopCountdown = 0;
+    this.timeScale = 1.0;
     this.hasEscaped = false;
+    this.winnerTeam = undefined;
     this.particles = [];
     this.shockwaves = [];
     this.maxSpeedReached = this.config.INITIAL_SPEED;
 
-    this.initSegments();
-    this.initSecondaryBalls();
-    this.ball.reset(CENTER_X, CENTER_Y, this.config);
+    this.initArena();
+    this.initBalls();
 
     this.syncHUD();
   }
@@ -156,91 +245,162 @@ export class BallEscapeGame implements GameInstance {
     if (this.state === 'WAITING') {
       statusText = this.config.TEXT_STATUS_START || 'Clique pour démarrer';
     } else if (this.state === 'ESCAPED') {
-      statusText = this.config.TEXT_STATUS_ESCAPE || 'Évasion réussie !';
+      if (this.config.GAME_MODE === 'duel' && this.winnerTeam) {
+        statusText = `VICTOIRE ${this.winnerTeam} !`;
+      } else {
+        statusText = this.config.TEXT_STATUS_ESCAPE || 'Évasion réussie !';
+      }
     } else if (this.state === 'FROZEN') {
       statusText = this.hasEscaped
         ? (this.config.TEXT_STATUS_WIN || 'VICTOIRE !')
         : (this.config.TEXT_STATUS_LOSS || 'TEMPS ÉCOULÉ !');
     }
 
-    this.currentHUD = {
-      title: this.config.TEXT_TITLE || this.config.CHALLENGE_TITLE,
-      primaryMetricLabel: this.config.TEXT_METRIC_TIME || 'TEMPS RESTANT',
-      primaryMetricValue: `${sec}s`,
-      secondaryMetricLabel: this.config.TEXT_METRIC_BOUNCES || 'REBONDS',
-      secondaryMetricValue: this.bounces,
-      isDanger: sec <= 5 && this.state === 'RUNNING',
-      isFinished: this.state === 'FROZEN',
-      isWaitingToStart: this.state === 'WAITING',
-      overlayPromptText: this.config.TEXT_STATUS_START || 'Clique pour démarrer',
-      statusText
-    };
+    if (this.config.GAME_MODE === 'duel' || this.balls.length > 1) {
+      const sorted = [...this.balls].sort((a, b) => {
+        if (b.currentRingIndex !== a.currentRingIndex) return b.currentRingIndex - a.currentRingIndex;
+        return b.bouncesCount - a.bouncesCount;
+      });
+      const top1 = sorted[0] || this.balls[0] || { label: 'P1', bouncesCount: 0, color: '#00f0ff' };
+      const top2 = sorted[1] || this.balls[1] || { label: 'P2', bouncesCount: 0, color: '#ff007f' };
+      const isMulti = this.balls.length > 2;
+      const p1Label = isMulti ? `1er: ${top1.label}` : top1.label;
+      const p2Label = isMulti ? `2e: ${top2.label}` : top2.label;
+
+      this.currentHUD = {
+        title: this.config.TEXT_TITLE || (isMulti ? `BATTLE ROYALE : ${this.balls.length} BILLES` : 'DUEL : QUI SORTIRA EN PREMIER ?'),
+        primaryMetricLabel: p1Label,
+        primaryMetricValue: top1.bouncesCount,
+        primaryMetricColor: top1.color,
+        secondaryMetricLabel: p2Label,
+        secondaryMetricValue: top2.bouncesCount,
+        secondaryMetricColor: top2.color,
+        statusText,
+        isDanger: sec <= 5 && this.state === 'RUNNING',
+        isFinished: this.state === 'FROZEN',
+        isWaitingToStart: this.state === 'WAITING',
+        overlayPromptText: this.config.TEXT_STATUS_START || 'Clique pour démarrer',
+        topOffset: this.config.HUD_TOP_OFFSET || 0
+      };
+    } else if (this.config.GAME_MODE === 'multi-ring' || this.rings.length > 1) {
+      const mainBall = this.balls[0];
+      const maxRing = mainBall ? mainBall.currentRingIndex : 0;
+      const currentRing = Math.min(this.rings.length, maxRing + 1);
+      this.currentHUD = {
+        title: this.config.TEXT_TITLE || `CAN IT ESCAPE ${this.rings.length} RINGS?`,
+        primaryMetricLabel: 'ANNEAU',
+        primaryMetricValue: `${currentRing}/${this.rings.length}`,
+        primaryMetricColor: '#00f0ff',
+        secondaryMetricLabel: this.config.TEXT_METRIC_BOUNCES || 'REBONDS',
+        secondaryMetricValue: this.bounces,
+        statusText,
+        isDanger: sec <= 5 && this.state === 'RUNNING',
+        isFinished: this.state === 'FROZEN',
+        isWaitingToStart: this.state === 'WAITING',
+        overlayPromptText: this.config.TEXT_STATUS_START || 'Clique pour démarrer',
+        topOffset: this.config.HUD_TOP_OFFSET || 0
+      };
+    } else {
+      this.currentHUD = {
+        title: this.config.TEXT_TITLE || 'CAN THE BALL ESCAPE IN 30s?',
+        primaryMetricLabel: this.config.TEXT_METRIC_TIME || 'TEMPS',
+        primaryMetricValue: `${sec}s`,
+        primaryMetricColor: sec <= 5 ? '#ef4444' : '#00f0ff',
+        secondaryMetricLabel: this.config.TEXT_METRIC_BOUNCES || 'REBONDS',
+        secondaryMetricValue: this.bounces,
+        statusText,
+        isDanger: sec <= 5 && this.state === 'RUNNING',
+        isFinished: this.state === 'FROZEN',
+        isWaitingToStart: this.state === 'WAITING',
+        overlayPromptText: this.config.TEXT_STATUS_START || 'Clique pour démarrer',
+        topOffset: this.config.HUD_TOP_OFFSET || 0
+      };
+    }
+
     this.onHUDUpdate(this.currentHUD);
   }
 
-  private handleBounce(
-    segment: WallSegment,
+  private handleBounceOnRing(
+    ball: Ball,
+    ring: ArenaRing,
+    segment: any,
     contactX: number,
     contactY: number,
     normalX: number,
     normalY: number
   ) {
     this.bounces++;
+    ball.bouncesCount++;
 
-    const currentSpeed = Math.hypot(this.ball.vx, this.ball.vy);
-    const newSpeed = Math.min(this.config.MAX_SPEED, currentSpeed * this.config.BOUNCE_SPEED_MULTIPLIER);
-    const norm = currentSpeed > 0 ? newSpeed / currentSpeed : 1;
-    this.ball.vx *= norm;
-    this.ball.vy *= norm;
-    this.ball.speed = newSpeed;
-
-    if (newSpeed > this.maxSpeedReached) {
-      this.maxSpeedReached = newSpeed;
+    if (ball.speed > this.maxSpeedReached) {
+      this.maxSpeedReached = ball.speed;
     }
 
-    this.ball.flash = 1.0;
-    this.ball.updateColor(this.config);
+    ball.flash = 1.0;
+    ball.updateColor(this.config);
 
-    const destroyed = segment.hit();
+    const destroyed = segment && segment.hit ? segment.hit() : false;
 
-    const speedRatio =
-      (this.ball.speed - this.config.INITIAL_SPEED) /
-      Math.max(1, this.config.MAX_SPEED - this.config.INITIAL_SPEED);
-    sound.playBounce(this.bounces, speedRatio);
+    // Son de rebond ASMR (Mélodie virale ou instrument sélectionné)
+    if (this.config.SOUND_BOUNCE_ENABLED) {
+      const speedRatio =
+        (ball.speed - this.config.INITIAL_SPEED) /
+        Math.max(1, this.config.MAX_SPEED - this.config.INITIAL_SPEED);
+
+      sound.playBallBounce(ball.bouncesCount, {
+        instrument: this.config.SOUND_BOUNCE_STYLE || 'piano',
+        melodyPreset: this.config.SOUND_MELODY_PRESET || 'pentatonic',
+        volume: this.config.SOUND_BOUNCE_VOLUME,
+        pitchMult: this.config.SOUND_PITCH_MULT || 1.0,
+        speedRatio,
+        comboIndex: this.config.SOUND_COMBO_PITCH ? this.bounces : 0
+      });
+    }
 
     if (destroyed) {
-      sound.playWallDestroy();
+      if (this.config.SOUND_BREAK_ENABLED) {
+        sound.playBallBreak({
+          style: this.config.SOUND_BREAK_STYLE || 'crunch',
+          volume: this.config.SOUND_BREAK_VOLUME,
+          pitchMult: this.config.SOUND_PITCH_MULT || 1.0
+        });
+      }
       this.spawnDebris(contactX, contactY);
-      this.triggerScreenShake(6);
+      this.triggerScreenShake(5);
     } else {
-      this.triggerScreenShake(2 + speedRatio * 3);
+      this.triggerScreenShake(2);
     }
 
-    this.spawnWallSparks(contactX, contactY, normalX, normalY);
-    this.shockwaves.push(new Shockwave(contactX, contactY, this.ball.color, 45, 5));
+    this.spawnWallSparks(contactX, contactY, normalX, normalY, ball.color);
+    if (this.config.SHOCKWAVE_ENABLED !== false) {
+      const swDuration =
+        this.config.SHOCKWAVE_DURATION !== undefined ? this.config.SHOCKWAVE_DURATION : 0.45;
+      this.shockwaves.push(new Shockwave(contactX, contactY, ball.color, 45, swDuration));
+    }
 
-    if (this.config.SPAWN_SECONDARY_BALL_ON_BRICK_HIT) {
-      const maxBalls = this.config.MAX_SECONDARY_BALLS || 12;
-      if (this.secondaryBalls.length < maxBalls) {
-        const newBall = SecondaryBall.createRandom(this.config, CENTER_X, CENTER_Y);
-        this.secondaryBalls.push(newBall);
+    // Duplication de balle / Tempête de balles
+    const shouldSpawn =
+      this.config.BALL_DUPLICATION_ON_BOUNCE ||
+      this.config.GAME_MODE === 'ball-storm';
 
-        this.shockwaves.push(new Shockwave(CENTER_X, CENTER_Y, newBall.color, 32, 5));
-        for (let b = 0; b < 6; b++) {
-          const sAng = Math.random() * Math.PI * 2;
-          const sSpd = 2 + Math.random() * 4;
-          this.particles.push(
-            new Particle(
-              CENTER_X,
-              CENTER_Y,
-              Math.cos(sAng) * sSpd,
-              Math.sin(sAng) * sSpd,
-              newBall.color,
-              2,
-              0.35,
-              2.5
-            )
-          );
+    if (shouldSpawn) {
+      const maxBalls = this.config.MAX_BALLS || 16;
+      if (this.balls.length < maxBalls) {
+        const cy = this.getCenterY();
+        const newBall = new Ball(
+          this.balls.length,
+          CENTER_X,
+          cy,
+          this.config.BALL_RADIUS * 0.9,
+          ball.team
+        );
+        const spreadAngle = this.prng.range(0, Math.PI * 2);
+        newBall.reset(CENTER_X, cy, this.config, spreadAngle, this.prng);
+        this.balls.push(newBall);
+        if (this.config.SHOCKWAVE_ENABLED !== false) {
+          const swDuration =
+            this.config.SHOCKWAVE_DURATION !== undefined ? this.config.SHOCKWAVE_DURATION : 0.45;
+          this.shockwaves.push(new Shockwave(CENTER_X, cy, newBall.color, 30, swDuration));
         }
       }
     }
@@ -248,16 +408,25 @@ export class BallEscapeGame implements GameInstance {
     this.syncHUD();
   }
 
-  private handleEscape() {
+  private handleEscape(ball: Ball) {
     if (this.hasEscaped) return;
 
     this.hasEscaped = true;
     this.state = 'ESCAPED';
-    this.freezeTimer = this.config.FREEZE_DELAY_AFTER_ESCAPE;
+    this.timeScale = this.config.BULLET_TIME_FACTOR || 0.25; // Bullet Time ralenti fluide
+    this.freezeTimer = this.config.FREEZE_DELAY_AFTER_ESCAPE || 1.0;
+    this.loopCountdown = this.config.PERFECT_LOOP_DELAY || 2.2;
 
-    sound.playEscape();
+    if (this.config.GAME_MODE === 'duel' || this.balls.length > 1) {
+      this.winnerTeam = ball.label || (ball.team ? ball.team.toUpperCase() : 'VAINQUEUR');
+    }
+
+    if (this.config.SOUND_ESCAPE_ENABLED) {
+      sound.playBallEscape(this.config.SOUND_ESCAPE_VOLUME);
+    }
+
     this.triggerScreenShake(8);
-    this.spawnEscapeFireworks(this.ball.x, this.ball.y);
+    this.spawnEscapeFireworks(ball.x, ball.y);
     this.syncHUD();
   }
 
@@ -268,46 +437,46 @@ export class BallEscapeGame implements GameInstance {
     this.syncHUD();
   }
 
-  private spawnWallSparks(x: number, y: number, nx: number, ny: number) {
-    const count = 10 + Math.floor(Math.random() * 6);
+  private spawnWallSparks(x: number, y: number, nx: number, ny: number, color: string) {
+    const count = 10 + this.prng.rangeInt(0, 4);
     for (let i = 0; i < count; i++) {
-      const angle = Math.atan2(-ny, -nx) + (Math.random() - 0.5) * 1.5;
-      const spd = 2 + Math.random() * 6;
+      const angle = Math.atan2(-ny, -nx) + this.prng.jitter(1.5);
+      const spd = this.prng.range(2, 7);
       const vx = Math.cos(angle) * spd;
       const vy = Math.sin(angle) * spd;
-      const size = 1.5 + Math.random() * 2.5;
-      const life = 0.35 + Math.random() * 0.25;
-      this.particles.push(new Particle(x, y, vx, vy, this.ball.color, size, life, 1.8));
+      const size = this.prng.range(1.5, 3.5);
+      const life = this.prng.range(0.35, 0.6);
+      this.particles.push(new Particle(x, y, vx, vy, color, size, life, 1.8));
     }
   }
 
   private spawnDebris(x: number, y: number) {
-    const debrisColors = ['#ff0044', '#ff7700', '#ffe600', '#ffffff'];
-    const count = 18;
+    const debrisColors = ['#ff0055', '#ff7700', '#ffee00', '#ffffff', '#00f0ff'];
+    const count = 16;
     for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const spd = 3 + Math.random() * 8;
+      const angle = this.prng.next() * Math.PI * 2;
+      const spd = this.prng.range(3, 10);
       const vx = Math.cos(angle) * spd;
       const vy = Math.sin(angle) * spd;
-      const size = 3 + Math.random() * 4;
-      const life = 0.7 + Math.random() * 0.4;
-      const color = debrisColors[Math.floor(Math.random() * debrisColors.length)];
+      const size = this.prng.range(2.5, 6);
+      const life = this.prng.range(0.7, 1.1);
+      const color = this.prng.choice(debrisColors);
       this.particles.push(new Particle(x, y, vx, vy, color, size, life, 1.2, true));
     }
   }
 
   private spawnEscapeFireworks(x: number, y: number) {
-    const colors = ['#00f0ff', '#ffe600', '#ff0055', '#a6ff00', '#ffffff', '#ff9900'];
-    const count = this.config.CONFETTI_COUNT || 120;
+    const colors = ['#00f0ff', '#ff007f', '#ffe600', '#00ff88', '#ffffff', '#bf00ff'];
+    const count = this.config.CONFETTI_COUNT || 180;
     for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const spd = 5 + Math.random() * 12;
+      const angle = this.prng.next() * Math.PI * 2;
+      const spd = this.prng.range(5, 17);
       const vx = Math.cos(angle) * spd;
       const vy = Math.sin(angle) * spd;
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      const size = 3 + Math.random() * 4;
-      const life = 1.5 + Math.random() * 0.8;
-      this.particles.push(new Particle(x, y, vx, vy, color, size, life, 0.7, true));
+      const color = this.prng.choice(colors);
+      const size = this.prng.range(3, 7);
+      const life = this.prng.range(1.8, 2.6);
+      this.particles.push(new Particle(x, y, vx, vy, color, size, life, 0.65, true));
     }
   }
 
@@ -317,6 +486,286 @@ export class BallEscapeGame implements GameInstance {
     const maxShake = this.config.SCREEN_SHAKE_MAX ?? 3.0;
     const effective = Math.min(maxShake, intensity * mult);
     this.screenShake = Math.max(this.screenShake, effective);
+  }
+
+  private spawnRingClearParticles(cx: number, cy: number, radius: number, ballColor: string) {
+    const count = 36;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      const spd = this.prng.range(2, 6);
+      const vx = Math.cos(angle) * spd;
+      const vy = Math.sin(angle) * spd;
+      const size = this.prng.range(2, 4);
+      const life = this.prng.range(0.4, 0.8);
+      const color =
+        this.config.ARENA_COLOR === 'rainbow'
+          ? `hsl(${Math.round((i / count) * 360)}, 100%, 60%)`
+          : ballColor;
+      this.particles.push(new Particle(x, y, vx, vy, color, size, life, 1.5, false));
+    }
+  }
+
+  private advanceRing(ball: Ball) {
+    if (ball.currentRingIndex < this.rings.length - 1) {
+      // Franchissement vers l'anneau extérieur supérieur
+      const clearedRing = this.rings[ball.currentRingIndex];
+      clearedRing.isCleared = true;
+      ball.currentRingIndex++;
+
+      this.spawnRingClearParticles(CENTER_X, this.getCenterY(), clearedRing.radius, ball.color);
+      if (this.config.SHOCKWAVE_ENABLED !== false) {
+        const swDuration =
+          this.config.SHOCKWAVE_DURATION !== undefined ? this.config.SHOCKWAVE_DURATION : 0.45;
+        this.shockwaves.push(new Shockwave(ball.x, ball.y, '#ffffff', 55, swDuration));
+      }
+
+      if (this.config.SOUND_BOUNCE_ENABLED) {
+        sound.playBallBounce(ball.bouncesCount, {
+          instrument: 'synth',
+          pitchMult: 1.45,
+          volume: 0.95
+        });
+      }
+      this.syncHUD();
+    } else {
+      // Échappé de tous les anneaux !
+      const outermostRing = this.rings[this.rings.length - 1];
+      if (outermostRing) {
+        outermostRing.isCleared = true;
+      }
+      ball.isEscaping = true;
+      if (this.config.SHOCKWAVE_ENABLED !== false) {
+        const swDuration =
+          this.config.SHOCKWAVE_DURATION !== undefined ? this.config.SHOCKWAVE_DURATION : 0.45;
+        this.shockwaves.push(new Shockwave(ball.x, ball.y, '#ffd700', 65, swDuration));
+      }
+    }
+  }
+
+  private applyBounceDeflectionAndSpin(
+    ball: Ball,
+    nx: number,
+    ny: number,
+    rotSpeed: number,
+    R: number
+  ) {
+    // nx, ny est le vecteur normal unitaire dirigé vers la surface d'impact (vers l'extérieur de l'arène)
+    // La normale intérieure (dirigée vers le centre de l'arène / espace libre) est donc (-nx, -ny)
+    const inNx = -nx;
+    const inNy = -ny;
+    const tangentX = -ny;
+    const tangentY = nx;
+
+    // Décomposition de la vitesse après réflexion géométrique
+    let vInward = ball.vx * inNx + ball.vy * inNy;
+    let vTangent = ball.vx * tangentX + ball.vy * tangentY;
+
+    // Assurer que la balle s'éloigne impérativement de la paroi
+    if (vInward < 1) {
+      vInward = Math.max(1, Math.abs(vInward));
+    }
+
+    // 1. Transfert de rotation de la paroi (frottement dynamique avec l'arène tournante)
+    const wallTangentSpeed = rotSpeed * R;
+    const slip = wallTangentSpeed - vTangent;
+    const spinFactor =
+      this.config.WALL_SPIN_TRANSFER !== undefined ? this.config.WALL_SPIN_TRANSFER : 0.45;
+    vTangent += slip * spinFactor;
+
+    // 2. Angle de rebond de référence par rapport à la normale intérieure
+    const baseAngle = Math.atan2(vTangent, vInward);
+
+    // 3. Aléatoire de Direction (BOUNCE_DIR_RANDOMNESS : 0% à 100%)
+    const dirRandPct =
+      this.config.BOUNCE_DIR_RANDOMNESS !== undefined
+        ? this.config.BOUNCE_DIR_RANDOMNESS
+        : (this.config.BOUNCE_RANDOMNESS !== undefined ? this.config.BOUNCE_RANDOMNESS : 25);
+    const dirNorm = Math.max(0, Math.min(100, dirRandPct)) / 100;
+
+    let finalAngle = baseAngle;
+    if (dirNorm > 0) {
+      // Déviation angulaire jusqu'à ±65° (1.13 rad) à 100%
+      const maxDeflectAngle = dirNorm * 1.15;
+      const angleJitter = (this.prng.next() * 2 - 1) * maxDeflectAngle;
+      finalAngle = baseAngle + angleJitter;
+    }
+
+    // Clamp de sécurité : l'angle ne doit jamais dépasser 75° pour garantir un retour franc vers l'intérieur
+    const maxSafeAngle = Math.PI * 0.42; // ~75.6°
+    finalAngle = Math.max(-maxSafeAngle, Math.min(maxSafeAngle, finalAngle));
+
+    // 4. Vitesse et Aléatoire de Vitesse (BOUNCE_SPEED_RANDOMNESS : 0% à 100%)
+    const baseMult = this.config.BOUNCE_SPEED_MULTIPLIER || 1.03;
+    const speedRandPct =
+      this.config.BOUNCE_SPEED_RANDOMNESS !== undefined
+        ? this.config.BOUNCE_SPEED_RANDOMNESS
+        : 20;
+    const speedNorm = Math.max(0, Math.min(100, speedRandPct)) / 100;
+
+    let speedMult = baseMult;
+    if (speedNorm > 0) {
+      // Variation de vitesse jusqu'à ±35% à 100% (ex: 0.67x à 1.39x)
+      const speedJitter = (this.prng.next() * 2 - 1) * (0.35 * speedNorm);
+      speedMult = Math.max(0.75, baseMult * (1.0 + speedJitter));
+    }
+
+    // Calcul de la vitesse finale
+    const curSpeed = ball.speed || Math.hypot(ball.vx, ball.vy) || this.config.INITIAL_SPEED;
+    const newSpeed = Math.min(
+      this.config.MAX_SPEED,
+      Math.max(this.config.INITIAL_SPEED * 0.5, curSpeed * speedMult)
+    );
+    ball.speed = newSpeed;
+
+    // 5. Reconstruction précise du vecteur vitesse (ball.vx, ball.vy)
+    const finalVInward = newSpeed * Math.cos(finalAngle);
+    const finalVTangent = newSpeed * Math.sin(finalAngle);
+
+    ball.vx = inNx * finalVInward + tangentX * finalVTangent;
+    ball.vy = inNy * finalVInward + tangentY * finalVTangent;
+  }
+
+  private updateBallPhysics(ball: Ball, subDt: number, centerY: number) {
+    ball.vy += this.config.GRAVITY * subDt;
+    ball.x += ball.vx * subDt;
+    ball.y += ball.vy * subDt;
+
+    const dx = ball.x - CENTER_X;
+    const dy = ball.y - centerY;
+    const dist = Math.hypot(dx, dy);
+
+    if (ball.isEscaping) {
+      const outermostRadius = this.rings[this.rings.length - 1]?.radius || this.config.CIRCLE_RADIUS;
+      if (dist >= outermostRadius + ball.radius + 20) {
+        this.handleEscape(ball);
+      }
+      return;
+    }
+
+    const currentRing = this.rings[ball.currentRingIndex];
+    if (!currentRing) {
+      ball.isEscaping = true;
+      return;
+    }
+
+    const strokeWidth = this.config.ARENA_STROKE_WIDTH || 8;
+    const R = currentRing.radius;
+    const r = ball.radius;
+    const limitRadius = R - strokeWidth * 0.5 - r;
+
+    const nx = dist > 0.001 ? dx / dist : 0;
+    const ny = dist > 0.001 ? dy / dist : -1;
+    const dot = ball.vx * nx + ball.vy * ny;
+
+    let ballAngle = Math.atan2(dy, dx);
+    if (ballAngle < 0) ballAngle += Math.PI * 2;
+
+    let dTheta = (ballAngle - currentRing.angle) % (Math.PI * 2);
+    if (dTheta > Math.PI) dTheta -= Math.PI * 2;
+    if (dTheta < -Math.PI) dTheta += Math.PI * 2;
+    const absDTheta = Math.abs(dTheta);
+
+    const halfGap = currentRing.gapSize / 2;
+    const angularClearance = Math.asin(Math.min(0.9, r / R));
+
+    if (currentRing.gapMode === 'rotating-gap') {
+      // Détection des extrémités de la brèche (lèvres)
+      const lip1Angle = currentRing.angle - halfGap;
+      const lip2Angle = currentRing.angle + halfGap;
+      const lip1X = CENTER_X + Math.cos(lip1Angle) * R;
+      const lip1Y = centerY + Math.sin(lip1Angle) * R;
+      const lip2X = CENTER_X + Math.cos(lip2Angle) * R;
+      const lip2Y = centerY + Math.sin(lip2Angle) * R;
+
+      const dLip1 = Math.hypot(ball.x - lip1X, ball.y - lip1Y);
+      const dLip2 = Math.hypot(ball.x - lip2X, ball.y - lip2Y);
+      const lipHitRadius = r + strokeWidth * 0.5;
+
+      let hitLip = false;
+      let hitLipX = 0;
+      let hitLipY = 0;
+      let dLip = 0;
+
+      if (dLip1 < lipHitRadius) {
+        hitLip = true;
+        hitLipX = lip1X;
+        hitLipY = lip1Y;
+        dLip = dLip1;
+      } else if (dLip2 < lipHitRadius) {
+        hitLip = true;
+        hitLipX = lip2X;
+        hitLipY = lip2Y;
+        dLip = dLip2;
+      }
+
+      if (hitLip) {
+        // Rebond sur le coin arrondi de la brèche
+        const lnx = dLip > 0.001 ? (ball.x - hitLipX) / dLip : nx;
+        const lny = dLip > 0.001 ? (ball.y - hitLipY) / dLip : ny;
+        const lipDot = ball.vx * lnx + ball.vy * lny;
+
+        if (lipDot < 0) {
+          ball.x = hitLipX + lnx * (lipHitRadius + 1.0);
+          ball.y = hitLipY + lny * (lipHitRadius + 1.0);
+
+          ball.vx = ball.vx - 2 * lipDot * lnx;
+          ball.vy = ball.vy - 2 * lipDot * lny;
+
+          // La normale dirigée vers l'obstacle (le coin) est (-lnx, -lny)
+          this.applyBounceDeflectionAndSpin(ball, -lnx, -lny, currentRing.rotSpeed, R);
+          this.handleBounceOnRing(ball, currentRing, null, hitLipX, hitLipY, -lnx, -lny);
+        }
+      } else if (absDTheta < halfGap - angularClearance) {
+        // Dans l'ouverture libre de la brèche
+        if (dist >= R && dot > 0) {
+          this.advanceRing(ball);
+        }
+      } else if (dist >= limitRadius) {
+        // Collision avec l'arc plein de la paroi
+        if (dot > 0) {
+          ball.x = CENTER_X + nx * (limitRadius - 1.2);
+          ball.y = centerY + ny * (limitRadius - 1.2);
+
+          ball.vx = ball.vx - 2 * dot * nx;
+          ball.vy = ball.vy - 2 * dot * ny;
+
+          this.applyBounceDeflectionAndSpin(ball, nx, ny, currentRing.rotSpeed, R);
+
+          const contactX = CENTER_X + nx * R;
+          const contactY = centerY + ny * R;
+          this.handleBounceOnRing(ball, currentRing, null, contactX, contactY, nx, ny);
+        }
+      }
+    } else {
+      // Mode 'bricks'
+      let relAngle = (ballAngle - currentRing.angle) % (Math.PI * 2);
+      if (relAngle < 0) relAngle += Math.PI * 2;
+
+      const segIdx =
+        Math.floor((relAngle / (Math.PI * 2)) * currentRing.segments.length) %
+        currentRing.segments.length;
+      const segment = currentRing.segments[segIdx];
+
+      if (!segment || !segment.isAlive) {
+        if (dist >= R && dot > 0) {
+          this.advanceRing(ball);
+        }
+      } else if (dist >= limitRadius && dot > 0) {
+        ball.x = CENTER_X + nx * (limitRadius - 1.2);
+        ball.y = centerY + ny * (limitRadius - 1.2);
+
+        ball.vx = ball.vx - 2 * dot * nx;
+        ball.vy = ball.vy - 2 * dot * ny;
+
+        this.applyBounceDeflectionAndSpin(ball, nx, ny, currentRing.rotSpeed, R);
+
+        const contactX = CENTER_X + nx * R;
+        const contactY = centerY + ny * R;
+        this.handleBounceOnRing(ball, currentRing, segment, contactX, contactY, nx, ny);
+      }
+    }
   }
 
   private updatePhysics(dt: number) {
@@ -337,211 +786,91 @@ export class BallEscapeGame implements GameInstance {
       }
     }
 
-    const rotSpeed = this.config.ARENA_ROTATION_SPEED || 0;
+    const centerY = this.getCenterY();
+    const effectiveDt = dt * this.timeScale;
     const subSteps = this.config.SUB_STEPS;
-    const subDt = dt / subSteps;
+    const subDt = effectiveDt / subSteps;
 
     for (let s = 0; s < subSteps; s++) {
-      this.arenaAngle = (this.arenaAngle + rotSpeed * subDt) % (Math.PI * 2);
-      if (this.arenaAngle < 0) this.arenaAngle += Math.PI * 2;
-
-      for (let i = this.secondaryBalls.length - 1; i >= 0; i--) {
-        const sec = this.secondaryBalls[i];
-        sec.updatePhysics(subDt, this.config, this.segments, this.arenaAngle);
-        if (sec.isDead) {
-          this.secondaryBalls.splice(i, 1);
-        }
+      // Rotation de tous les anneaux
+      for (let r = 0; r < this.rings.length; r++) {
+        this.rings[r].update(subDt);
       }
 
-      this.ball.vy += this.config.GRAVITY * subDt;
-      this.ball.x += this.ball.vx * subDt;
-      this.ball.y += this.ball.vy * subDt;
-
-      if (!this.ball.isEscaping) {
-        for (let i = 0; i < this.secondaryBalls.length; i++) {
-          const sec = this.secondaryBalls[i];
-          const cdx = this.ball.x - sec.x;
-          const cdy = this.ball.y - sec.y;
-          const cdist = Math.hypot(cdx, cdy);
-          const minDist = this.ball.radius + sec.radius;
-
-          if (cdist < minDist && cdist > 0) {
-            const cnx = cdx / cdist;
-            const cny = cdy / cdist;
-
-            const rvx = this.ball.vx - sec.vx;
-            const rvy = this.ball.vy - sec.vy;
-            const velAlongNormal = rvx * cnx + rvy * cny;
-
-            if (velAlongNormal < 0) {
-              const overlap = minDist - cdist;
-              this.ball.x += cnx * (overlap * 0.55);
-              this.ball.y += cny * (overlap * 0.55);
-              sec.x -= cnx * (overlap * 0.55);
-              sec.y -= cny * (overlap * 0.55);
-
-              if (!sec.isEscaping) {
-                const secDist = Math.hypot(sec.x - CENTER_X, sec.y - CENTER_Y);
-                const secLimit = this.config.CIRCLE_RADIUS - sec.radius;
-                if (secDist > secLimit) {
-                  sec.x = CENTER_X + ((sec.x - CENTER_X) / secDist) * secLimit;
-                  sec.y = CENTER_Y + ((sec.y - CENTER_Y) / secDist) * secLimit;
-                }
-              }
-
-              const speedBefore = Math.max(this.ball.speed, Math.hypot(this.ball.vx, this.ball.vy));
-
-              const dotBall = this.ball.vx * cnx + this.ball.vy * cny;
-              if (dotBall < 0) {
-                this.ball.vx -= 2 * dotBall * cnx;
-                this.ball.vy -= 2 * dotBall * cny;
-              }
-
-              this.ball.vx += -cny * (Math.random() - 0.5) * 0.1;
-              this.ball.vy += cnx * (Math.random() - 0.5) * 0.1;
-
-              const mult = this.config.SECONDARY_BALL_COUNTS_AS_BOUNCE
-                ? this.config.SECONDARY_BALL_BOUNCE_MULTIPLIER || 1.03
-                : 1.0;
-              const targetSpeed = Math.min(
-                this.config.MAX_SPEED,
-                Math.max(speedBefore, speedBefore * mult)
+      // Collisions physiques entre les billes (Ball-to-Ball)
+      if (this.config.BALL_COLLISION_ENABLED && this.balls.length > 1) {
+        const elasticity =
+          this.config.BALL_COLLISION_ELASTICITY !== undefined
+            ? this.config.BALL_COLLISION_ELASTICITY
+            : 0.98;
+        const dirNorm =
+          (this.config.BOUNCE_DIR_RANDOMNESS !== undefined
+            ? this.config.BOUNCE_DIR_RANDOMNESS
+            : (this.config.BOUNCE_RANDOMNESS ?? 25)) / 100;
+        const speedNorm =
+          (this.config.BOUNCE_SPEED_RANDOMNESS !== undefined
+            ? this.config.BOUNCE_SPEED_RANDOMNESS
+            : 20) / 100;
+        for (let i = 0; i < this.balls.length; i++) {
+          for (let j = i + 1; j < this.balls.length; j++) {
+            const b1 = this.balls[i];
+            const b2 = this.balls[j];
+            if (b1.currentRingIndex === b2.currentRingIndex) {
+              const collided = Ball.resolveBallBallCollision(
+                b1,
+                b2,
+                this.prng,
+                elasticity,
+                dirNorm,
+                speedNorm
               );
-
-              const postLen = Math.hypot(this.ball.vx, this.ball.vy);
-              if (postLen > 0) {
-                this.ball.vx = (this.ball.vx / postLen) * targetSpeed;
-                this.ball.vy = (this.ball.vy / postLen) * targetSpeed;
-              } else {
-                this.ball.vx = cnx * targetSpeed;
-                this.ball.vy = cny * targetSpeed;
-              }
-              this.ball.speed = targetSpeed;
-              if (targetSpeed > this.maxSpeedReached) {
-                this.maxSpeedReached = targetSpeed;
-              }
-
-              sec.vx = -cnx * sec.baseSpeed + -cny * (Math.random() - 0.5) * sec.baseSpeed * 0.5;
-              sec.vy = -cny * sec.baseSpeed + cnx * (Math.random() - 0.5) * sec.baseSpeed * 0.5;
-              const secLen = Math.hypot(sec.vx, sec.vy);
-              if (secLen > 0) {
-                sec.vx = (sec.vx / secLen) * sec.baseSpeed;
-                sec.vy = (sec.vy / secLen) * sec.baseSpeed;
-              }
-
-              this.ball.flash = 1.0;
-              sec.flash = 1.0;
-
-              const contactX = (this.ball.x + sec.x) / 2;
-              const contactY = (this.ball.y + sec.y) / 2;
-              this.shockwaves.push(new Shockwave(contactX, contactY, sec.color, 45, 6));
-              this.spawnWallSparks(contactX, contactY, -cnx, -cny);
-              this.triggerScreenShake(3.5);
-
-              if (this.config.SECONDARY_BALL_COUNTS_AS_BOUNCE) {
-                this.bounces++;
-                this.ball.updateColor(this.config);
-                const speedRatio =
-                  (this.ball.speed - this.config.INITIAL_SPEED) /
-                  Math.max(1, this.config.MAX_SPEED - this.config.INITIAL_SPEED);
-                sound.playBounce(this.bounces, speedRatio);
-              } else {
-                sound.playBounce(this.bounces, 0.4);
+              if (collided) {
+                const mx = (b1.x + b2.x) * 0.5;
+                const my = (b1.y + b2.y) * 0.5;
+                if (this.config.SHOCKWAVE_ENABLED !== false) {
+                  const swDuration =
+                    this.config.SHOCKWAVE_DURATION !== undefined ? this.config.SHOCKWAVE_DURATION : 0.45;
+                  this.shockwaves.push(new Shockwave(mx, my, '#ffffff', 26, swDuration));
+                }
               }
             }
           }
         }
       }
 
-      const dx = this.ball.x - CENTER_X;
-      const dy = this.ball.y - CENTER_Y;
-      const dist = Math.hypot(dx, dy);
-
-      if (this.ball.isEscaping) {
-        if (dist >= this.config.CIRCLE_RADIUS + this.ball.radius * 0.4) {
-          this.handleEscape();
-          break;
-        }
-        continue;
-      }
-
-      const limitRadius = this.config.CIRCLE_RADIUS - this.ball.radius;
-
-      if (dist >= limitRadius) {
-        const nx = dx / (dist || 1);
-        const ny = dy / (dist || 1);
-        const dot = this.ball.vx * nx + this.ball.vy * ny;
-
-        let angle = Math.atan2(dy, dx);
-        if (angle < 0) angle += Math.PI * 2;
-
-        let relAngle = (angle - this.arenaAngle) % (Math.PI * 2);
-        if (relAngle < 0) relAngle += Math.PI * 2;
-
-        const segmentIndex =
-          Math.floor((relAngle / (Math.PI * 2)) * this.config.TOTAL_WALL_SEGMENTS) %
-          this.config.TOTAL_WALL_SEGMENTS;
-        const segment = this.segments[segmentIndex];
-
-        if (segment && segment.isAlive) {
-          if (dot > 0) {
-            this.ball.x = CENTER_X + nx * limitRadius;
-            this.ball.y = CENTER_Y + ny * limitRadius;
-
-            this.ball.vx = this.ball.vx - 2 * dot * nx;
-            this.ball.vy = this.ball.vy - 2 * dot * ny;
-
-            const tanVx = -ny * rotSpeed * this.config.CIRCLE_RADIUS * 0.08;
-            const tanVy = nx * rotSpeed * this.config.CIRCLE_RADIUS * 0.08;
-            this.ball.vx += tanVx;
-            this.ball.vy += tanVy;
-
-            const perpX = -ny;
-            const perpY = nx;
-            const jitter = (Math.random() - 0.5) * 0.12;
-            this.ball.vx += perpX * jitter;
-            this.ball.vy += perpY * jitter;
-
-            const contactX = CENTER_X + nx * this.config.CIRCLE_RADIUS;
-            const contactY = CENTER_Y + ny * this.config.CIRCLE_RADIUS;
-
-            this.handleBounce(segment, contactX, contactY, nx, ny);
-          }
-        } else {
-          if (dot > 0) {
-            this.ball.isEscaping = true;
-          }
-        }
+      // Physique de toutes les billes
+      for (let i = 0; i < this.balls.length; i++) {
+        this.updateBallPhysics(this.balls[i], subDt, centerY);
       }
     }
 
+    // Traînées lumineuses de toutes les billes
     if (this.state === 'RUNNING' || this.state === 'ESCAPED') {
-      this.ball.trail.push({
-        x: this.ball.x,
-        y: this.ball.y,
-        color: this.ball.color
-      });
-      if (this.ball.trail.length > this.ball.maxTrail) {
-        this.ball.trail.shift();
+      for (let i = 0; i < this.balls.length; i++) {
+        const b = this.balls[i];
+        b.trail.push({ x: b.x, y: b.y, color: b.color });
+        if (b.trail.length > b.maxTrail) {
+          b.trail.shift();
+        }
       }
     }
 
+    // Boucle Parfaite (Perfect Loop) automatique pour TikTok
     if (this.state === 'ESCAPED') {
-      this.freezeTimer -= dt;
-      if (this.freezeTimer <= 0) {
-        this.freezeTimer = 0;
-        this.state = 'FROZEN';
-        this.syncHUD();
+      this.loopCountdown -= dt;
+      if (this.loopCountdown <= 0) {
+        if (this.config.PERFECT_LOOP_ENABLED) {
+          this.reset();
+        } else {
+          this.state = 'FROZEN';
+          this.syncHUD();
+        }
       }
     }
   }
 
   private updateEntities(dt: number) {
     if (this.state === 'FROZEN') return;
-
-    for (let i = 0; i < this.segments.length; i++) {
-      this.segments[i].update(dt);
-    }
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
@@ -560,8 +889,8 @@ export class BallEscapeGame implements GameInstance {
     }
 
     if (this.screenShake > 0) {
-      this.shakeX = (Math.random() - 0.5) * this.screenShake;
-      this.shakeY = (Math.random() - 0.5) * this.screenShake;
+      this.shakeX = this.prng.jitter(this.screenShake);
+      this.shakeY = this.prng.jitter(this.screenShake);
       const decay = this.config.SCREEN_SHAKE_DECAY ?? 18.0;
       this.screenShake = Math.max(0, this.screenShake - decay * dt);
     } else {
@@ -584,67 +913,143 @@ export class BallEscapeGame implements GameInstance {
     this.drawBackground();
     this.drawArena();
 
-    for (let i = 0; i < this.shockwaves.length; i++) {
-      this.shockwaves[i].draw(this.ctx);
+    if (this.config.SHOCKWAVE_ENABLED !== false) {
+      for (let i = 0; i < this.shockwaves.length; i++) {
+        this.shockwaves[i].draw(this.ctx);
+      }
     }
 
     for (let i = 0; i < this.particles.length; i++) {
       this.particles[i].draw(this.ctx);
     }
 
-    for (let i = 0; i < this.secondaryBalls.length; i++) {
-      this.secondaryBalls[i].draw(this.ctx);
+    // Rendu de toutes les billes
+    for (let i = 0; i < this.balls.length; i++) {
+      this.balls[i].draw(this.ctx, this.config.BALL_SKIN, this.config.BALL_TRAIL_STYLE);
     }
 
-    this.ball.draw(this.ctx);
-
-    // Dessin du HUD textuel en haut du Canvas (inclus dans la vidéo 9:16)
-    drawCanvasHUD(this.ctx, this.currentHUD, VIRTUAL_WIDTH);
+    // Dessin du HUD textuel en haut du Canvas (Safe Zone & Video Recorder)
+    if (this.config.SHOW_TOP_HUD) {
+      drawCanvasHUD(this.ctx, this.currentHUD, VIRTUAL_WIDTH);
+    }
 
     this.ctx.restore();
   }
 
   private drawBackground() {
     this.ctx.save();
-    const bgGrad = this.ctx.createRadialGradient(
-      CENTER_X,
-      CENTER_Y,
-      15,
-      CENTER_X,
-      CENTER_Y,
-      this.config.CIRCLE_RADIUS
-    );
-    bgGrad.addColorStop(0, 'rgba(176, 38, 255, 0.09)');
-    bgGrad.addColorStop(0.45, 'rgba(0, 240, 255, 0.04)');
-    bgGrad.addColorStop(0.9, 'rgba(0, 0, 0, 0.2)');
+    const bgCol = this.config.BACKGROUND_COLOR || '#06080d';
+    this.ctx.fillStyle = bgCol;
+    this.ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+
+    const centerY = this.getCenterY();
+    const effect = this.config.BACKGROUND_EFFECT || 'cosmic-stars';
+
+    if (effect === 'cosmic-stars') {
+      // ✨ Étoiles Cosmiques scintillantes
+      this.ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < this.bgStars.length; i++) {
+        const s = this.bgStars[i];
+        s.y = (s.y + s.speed * 0.016) % VIRTUAL_HEIGHT;
+        this.ctx.globalAlpha = s.alpha * (0.6 + Math.sin(Date.now() * 0.003 + i) * 0.4);
+        this.ctx.beginPath();
+        this.ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+    } else if (effect === 'celestial-rays') {
+      // ☀️ Rayons célestes rotatifs
+      this.bgRayAngle += 0.003;
+      const rayCount = 12;
+      this.ctx.save();
+      this.ctx.translate(CENTER_X, centerY);
+      this.ctx.rotate(this.bgRayAngle);
+      for (let i = 0; i < rayCount; i++) {
+        const angle = (i * Math.PI * 2) / rayCount;
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, 0);
+        this.ctx.arc(0, 0, 420, angle - 0.12, angle + 0.12);
+        this.ctx.closePath();
+        this.ctx.fillStyle = 'rgba(0, 240, 255, 0.03)';
+        this.ctx.fill();
+      }
+      this.ctx.restore();
+    } else if (effect === 'cyber-grid') {
+      // 👾 Grille Cyber Synthwave 3D
+      this.bgGridOffset = (this.bgGridOffset + 0.8) % 35;
+      this.ctx.save();
+      this.ctx.strokeStyle = 'rgba(176, 38, 255, 0.09)';
+      this.ctx.lineWidth = 1;
+      const horizonY = centerY + 100;
+      for (let y = horizonY; y < VIRTUAL_HEIGHT; y += 22) {
+        const py = y + this.bgGridOffset;
+        if (py < VIRTUAL_HEIGHT) {
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, py);
+          this.ctx.lineTo(VIRTUAL_WIDTH, py);
+          this.ctx.stroke();
+        }
+      }
+      for (let x = -100; x <= VIRTUAL_WIDTH + 100; x += 35) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(CENTER_X, horizonY);
+        this.ctx.lineTo(x, VIRTUAL_HEIGHT);
+        this.ctx.stroke();
+      }
+      this.ctx.restore();
+    } else if (effect === 'aurora-waves') {
+      // 🌌 Vagues d'Aurore Boréale
+      const t = Date.now() * 0.0015;
+      this.ctx.save();
+      for (let w = 0; w < 3; w++) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, VIRTUAL_HEIGHT);
+        for (let x = 0; x <= VIRTUAL_WIDTH; x += 25) {
+          const y = centerY + Math.sin(x * 0.01 + t + w) * 60 + Math.cos(x * 0.005 - t) * 40;
+          this.ctx.lineTo(x, y);
+        }
+        this.ctx.lineTo(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        this.ctx.closePath();
+        this.ctx.fillStyle = w === 0 ? 'rgba(0, 255, 136, 0.04)' : 'rgba(0, 240, 255, 0.03)';
+        this.ctx.fill();
+      }
+      this.ctx.restore();
+    } else if (effect === 'hypnotic-tunnel') {
+      // 🌀 Tunnel Hypnotique
+      const tPulse = (Date.now() * 0.002) % 1;
+      this.ctx.save();
+      for (let r = 0; r < 5; r++) {
+        const rad = ((r + tPulse) / 5) * 320;
+        this.ctx.beginPath();
+        this.ctx.arc(CENTER_X, centerY, rad, 0, Math.PI * 2);
+        this.ctx.strokeStyle = `rgba(176, 38, 255, ${Math.max(0, 0.12 * (1 - rad / 320))})`;
+        this.ctx.lineWidth = 1.5;
+        this.ctx.stroke();
+      }
+      this.ctx.restore();
+    }
+
+    // Halo d'ambiance central sous l'arène
+    const outerRadius = this.rings[this.rings.length - 1]?.radius || this.config.CIRCLE_RADIUS;
+    const bgGrad = this.ctx.createRadialGradient(CENTER_X, centerY, 20, CENTER_X, centerY, outerRadius);
+    bgGrad.addColorStop(0, 'rgba(176, 38, 255, 0.08)');
+    bgGrad.addColorStop(0.5, 'rgba(0, 240, 255, 0.03)');
     bgGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     this.ctx.fillStyle = bgGrad;
     this.ctx.beginPath();
-    this.ctx.arc(CENTER_X, CENTER_Y, this.config.CIRCLE_RADIUS, 0, Math.PI * 2);
+    this.ctx.arc(CENTER_X, centerY, outerRadius, 0, Math.PI * 2);
     this.ctx.fill();
 
-    this.ctx.beginPath();
-    this.ctx.arc(CENTER_X, CENTER_Y, this.config.CIRCLE_RADIUS - 10, 0, Math.PI * 2);
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-    this.ctx.lineWidth = 1;
-    this.ctx.stroke();
-
-    this.ctx.beginPath();
-    this.ctx.arc(CENTER_X, CENTER_Y, 3, 0, Math.PI * 2);
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    this.ctx.fill();
     this.ctx.restore();
   }
 
   private drawArena() {
-    this.ctx.save();
-    this.ctx.translate(CENTER_X, CENTER_Y);
-    this.ctx.rotate(this.arenaAngle);
-    this.ctx.translate(-CENTER_X, -CENTER_Y);
-    for (let i = 0; i < this.segments.length; i++) {
-      this.segments[i].draw(this.ctx, CENTER_X, CENTER_Y, this.config.CIRCLE_RADIUS);
+    const centerY = this.getCenterY();
+    const strokeWidth = this.config.ARENA_STROKE_WIDTH || 8;
+    const arenaColor = this.config.ARENA_COLOR || 'rainbow';
+
+    for (let i = 0; i < this.rings.length; i++) {
+      this.rings[i].draw(this.ctx, CENTER_X, centerY, strokeWidth, arenaColor);
     }
-    this.ctx.restore();
   }
 
   private loop = (timestamp: number) => {

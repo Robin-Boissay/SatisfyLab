@@ -9,7 +9,8 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowLeft,
-  Grid
+  Grid,
+  Bookmark
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -20,6 +21,7 @@ interface SettingsPanelProps {
   onBackToHub: () => void;
   onConfigChange: (key: string, value: any) => void;
   onResetConfig: () => void;
+  onOpenPresets?: () => void;
   isOpenMobile: boolean;
   onToggleMobile: () => void;
 }
@@ -32,6 +34,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onBackToHub,
   onConfigChange,
   onResetConfig,
+  onOpenPresets,
   isOpenMobile,
   onToggleMobile
 }) => {
@@ -60,6 +63,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
           {isOpenMobile ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
+
+        {onOpenPresets && (
+          <button
+            type="button"
+            onClick={onOpenPresets}
+            className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/30 text-xs font-semibold text-cyan-400 flex items-center gap-1.5 flex-shrink-0"
+            title={t('settings.presets_tooltip')}
+          >
+            <Bookmark className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{t('settings.presets')}</span>
+          </button>
+        )}
       </div>
 
       {/* Main Content Area (Toggleable on mobile) */}
